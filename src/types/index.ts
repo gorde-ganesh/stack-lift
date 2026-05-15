@@ -31,6 +31,60 @@ export type BreakingChangeCategory =
  */
 export type EvidenceSource = 'observed' | 'inferred' | 'registry';
 
+// ── Interactive migration types ───────────────────────────────────────────────
+
+export type MigrationObjective =
+  | 'minimal-risk'
+  | 'security'
+  | 'modernization'
+  | 'performance'
+  | 'full-migration';
+
+export type BackupStrategy = 'branch' | 'tag' | 'none';
+
+export type ArtifactFormat = 'markdown' | 'json';
+
+export interface PackageAlternative {
+  name: string;
+  description: string;
+  apiSimilarity: 'high' | 'medium' | 'low';
+  migrationEffort: 'low' | 'medium' | 'high';
+  bundleNote?: string;
+  notes?: string;
+}
+
+export interface ReplacementEntry {
+  deprecated: string;
+  reason: string;
+  alternatives: PackageAlternative[];
+  skipOption: string;
+}
+
+export interface PackageReplacement {
+  package: string;
+  /** Name of chosen alternative, or null if user chose to skip. */
+  chosen: string | null;
+  occurrences: number;
+}
+
+export interface MigrationDecisions {
+  objective: MigrationObjective;
+  targetVersion: string;
+  packageReplacements: PackageReplacement[];
+  backupStrategy: BackupStrategy;
+  outputFormats: ArtifactFormat[];
+  outputDir: string;
+  autoApply: boolean;
+}
+
+export interface SessionState {
+  projectPath: string;
+  createdAt: string;
+  lastUpdatedAt: string;
+  decisions: Partial<MigrationDecisions>;
+  phase: 'discovery' | 'decisions' | 'planning' | 'done';
+}
+
 export interface TsconfigInfo {
   strict?: boolean;
   target?: string;

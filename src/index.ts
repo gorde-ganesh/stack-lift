@@ -27,4 +27,12 @@ export type {
   RefactorResult,
   UpgradeReport,
   AnalyzeOptions,
+  MigrationObjective,
+  BackupStrategy,
+  ArtifactFormat,
+  PackageAlternative,
+  ReplacementEntry,
+  PackageReplacement,
+  MigrationDecisions,
+  SessionState,
 } from './types/index.js';

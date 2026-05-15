@@ -7,8 +7,10 @@ import { runUpgrade } from './engines/orchestrator.js';
 import { detectStack } from './engines/stack-detector.js';
 import { analyzeDependencies } from './engines/dependency-analyzer.js';
 import { planUpgrade } from './engines/upgrade-planner.js';
+import { writeArtifacts } from './engines/artifact-writer.js';
+import { runInteractive } from './engines/interaction.js';
 import { installSkill, removeSkill, listSkills, searchSkills } from './skills/manager.js';
-import type { UpgradeReport, RiskLevel } from './types/index.js';
+import type { UpgradeReport, RiskLevel, ArtifactFormat } from './types/index.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -125,7 +127,7 @@ function printManualActions(report: UpgradeReport) {
   console.log('');
 }
 
-function printTerminalReport(report: UpgradeReport, outputPath?: string) {
+function printTerminalReport(report: UpgradeReport) {
   console.log('');
   console.log(chalk.bold.blue('  ╔══════════════════════════════════════════╗'));
   console.log(chalk.bold.blue('  ║           stack-lift upgrade report       ║'));
@@ -136,11 +138,6 @@ function printTerminalReport(report: UpgradeReport, outputPath?: string) {
   printDependencySummary(report);
   printCodeSuggestions(report);
   printManualActions(report);
-
-  if (outputPath) {
-    console.log(chalk.green(`  ✔ Report written to: ${outputPath}`));
-    console.log('');
-  }
 }
 
 // ── Commands ─────────────────────────────────────────────────────────────────
@@ -167,11 +164,14 @@ program
         );
       }
 
-      const deps = await analyzeDependencies(stack);
-      const outdated = deps.length;
+      const { outdated: deps, peerConflicts } = await analyzeDependencies(stack);
+      const outdatedCount = deps.length;
       console.log(
-        `  ${chalk.dim('Outdated packages:')} ${outdated > 0 ? chalk.yellow(outdated) : chalk.green(outdated)}`,
+        `  ${chalk.dim('Outdated packages:')} ${outdatedCount > 0 ? chalk.yellow(outdatedCount) : chalk.green(outdatedCount)}`,
       );
+      if (peerConflicts.length > 0) {
+        console.log(`  ${chalk.dim('Peer conflicts:  ')} ${chalk.red(peerConflicts.length)}`);
+      }
       console.log('');
       for (const d of deps.slice(0, 10)) {
         const riskFn = RISK_COLOR[d.risk];
@@ -187,7 +187,7 @@ program
       console.log('');
       console.log(
         chalk.dim(
-          `  Run ${chalk.white('stack-lift upgrade <path>')} to generate a full upgrade plan.`,
+          `  Run ${chalk.white('stack-lift migrate <path>')} for an interactive guided upgrade.`,
         ),
       );
       console.log('');
@@ -201,42 +201,51 @@ program
   .command('upgrade <path>')
   .description('Generate a full upgrade plan with breaking changes and code suggestions')
   .option('-t, --to <version>', 'Target major version (e.g. 18 for Angular 18)')
-  .option('-o, --output <format>', 'Output format: terminal | markdown | json', 'terminal')
+  .option(
+    '-o, --output <formats>',
+    'Comma-separated output formats: terminal,markdown,json  (default: terminal)',
+    'terminal',
+  )
+  .option('--out-dir <dir>', 'Directory for artifact files', './stacklift-output')
   .option('--apply', 'Apply automated AST-based code fixes in-place', false)
   .option('--dry-run', 'Show what --apply would change without writing files', false)
   .action(
     async (
       projectPath: string,
-      options: { to?: string; output: string; apply: boolean; dryRun: boolean },
+      options: { to?: string; output: string; outDir: string; apply: boolean; dryRun: boolean },
     ) => {
       const spinner = ora('Running upgrade analysis…').start();
       try {
         const resolved = path.resolve(projectPath);
-        const outputFormat = options.output as 'terminal' | 'markdown' | 'json';
+        const requestedFormats = options.output.split(',').map(f => f.trim()) as Array<'terminal' | 'markdown' | 'json'>;
+        const fileFormats = requestedFormats.filter(f => f === 'markdown' || f === 'json') as ArtifactFormat[];
+        const toTerminal = requestedFormats.includes('terminal');
+
+        // Use markdown/json for the orchestrator's single-format path if only one file format
+        const primaryFileFormat = fileFormats[0];
+        const orchFormat = primaryFileFormat ?? 'terminal';
 
         const result = await runUpgrade({
           projectPath: resolved,
           ...(options.to !== undefined ? { targetVersion: options.to } : {}),
           apply: options.apply,
-          outputFormat,
+          outputFormat: orchFormat === 'terminal' ? 'terminal' : orchFormat,
         });
 
         spinner.succeed('Analysis complete');
 
-        if (outputFormat === 'terminal') {
-          printTerminalReport(result.report, result.outputPath);
-        } else if (outputFormat === 'json') {
-          if (result.outputPath) {
-            console.log(chalk.green(`\n  ✔ JSON report written to: ${result.outputPath}\n`));
-          } else {
-            console.log(result.json);
+        if (toTerminal) {
+          printTerminalReport(result.report);
+        }
+
+        // Write all requested file formats
+        if (fileFormats.length > 0) {
+          const outDir = path.resolve(resolved, options.outDir);
+          const artifacts = writeArtifacts(result.report, outDir, fileFormats);
+          for (const a of artifacts) {
+            console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} report written to: ${a.filePath}`));
           }
-        } else if (outputFormat === 'markdown') {
-          if (result.outputPath) {
-            console.log(chalk.green(`\n  ✔ Markdown report written to: ${result.outputPath}\n`));
-          } else {
-            console.log(result.markdown);
-          }
+          console.log('');
         }
 
         if (options.apply) {
@@ -288,6 +297,24 @@ program
     } catch (err) {
       console.error(chalk.red(String(err)));
       process.exitCode = 1;
+    }
+  });
+
+program
+  .command('migrate <path>')
+  .description('Interactive guided migration — asks your intent, shows choices, writes artifacts')
+  .action(async (projectPath: string) => {
+    try {
+      await runInteractive(projectPath);
+    } catch (err) {
+      const msg = String(err);
+      if (msg.includes('User force closed')) {
+        // Ctrl+C — exit cleanly
+        console.log(chalk.dim('\n  Aborted.\n'));
+      } else {
+        console.error(chalk.red(msg));
+        process.exitCode = 1;
+      }
     }
   });
 
