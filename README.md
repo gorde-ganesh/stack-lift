@@ -1,13 +1,13 @@
 # StackLift
 
-> AI-powered frontend project upgrade skill for modernizing legacy codebases.
+> Interactive upgrade copilot for Angular, React, and TypeScript frontends.
 
-StackLift is a Claude Code–compatible AI skill and CLI tool that analyzes Angular, React, and TypeScript projects and produces incremental upgrade plans, breaking-change inventories, dependency modernization recommendations, and automated code refactors.
+StackLift analyzes legacy frontend projects and guides you through upgrading them — step by step, with choices at every decision point. It asks what you want, shows your options, and writes the artifacts.
 
-It works in two ways:
+It works two ways:
 
-- **As a skills.sh AI skill** — invoke it inside Claude Code to get upgrade guidance on any project in your editor
-- **As a standalone CLI** — run `stack-lift` against any frontend repository from your terminal
+- **As a Claude Code skill** — invoke `/stacklift` inside your editor for AI-guided analysis
+- **As a standalone CLI** — run `stack-lift migrate` from your terminal for a fully interactive session
 
 ---
 
@@ -16,9 +16,10 @@ It works in two ways:
 - [Overview](#overview)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Supported Frameworks](#supported-frameworks)
+- [Interactive migrate flow](#interactive-migrate-flow)
+- [Supported frameworks](#supported-frameworks)
 - [Architecture](#architecture)
-- [Example Workflows](#example-workflows)
+- [Example workflows](#example-workflows)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -26,78 +27,78 @@ It works in two ways:
 
 ## Overview
 
-Upgrading a legacy frontend project is one of the most expensive recurring engineering tasks. A single Angular 12 → 18 migration involves six major-version hops, dozens of breaking API changes, deprecated tooling, peer-dependency conflicts, and manual refactoring across an entire codebase.
+Upgrading a legacy frontend is expensive. Angular 12 → 20 involves nine major-version hops, dozens of breaking API changes, deprecated tooling, peer-dependency conflicts, and manual refactoring across an entire codebase — and every project makes different tradeoffs.
 
-StackLift eliminates the research burden. It:
+StackLift replaces the guesswork. It:
 
-1. **Detects** your project's exact stack — framework, version, build tool, TypeScript, RxJS, package manager, and monorepo layout
-2. **Plans** a safe incremental upgrade route (never skips a major version where doing so breaks things)
-3. **Inventories** every breaking change between your current and target version
-4. **Queries** the live npm registry to find outdated and deprecated packages — with caching, timeouts, and offline fallback
-5. **Scans** your source tree to locate which files need attention
-6. **Applies** automated fixes using AST transforms — not regex — so rewrites are structurally correct
-7. **Documents** everything — a markdown report with code examples, a manual-action checklist, and a rollback plan
+1. **Detects** your stack — framework version, build tool, TypeScript, RxJS, package manager, lockfile, tsconfig compiler options, monorepo layout
+2. **Asks** what you actually want: minimal risk? security cleanup? full modernization?
+3. **Queries** the live npm registry for outdated and deprecated packages — with peer dependency conflict detection
+4. **Offers choices** for deprecated packages — picks replacement options, shows API similarity and migration effort for each
+5. **Plans** a safe incremental upgrade path, never skipping a major version where doing so breaks things
+6. **Scans** your source tree to locate every file that needs attention
+7. **Applies** automated fixes using AST transforms via ts-morph
+8. **Writes** a versioned markdown report, JSON report, and per-step checklist to an output directory
 
 ---
 
 ## Installation
 
-### Skill install (recommended)
+### CLI (recommended)
 
 ```bash
-# One-shot — no global install needed
+npm install -g stack-lift
+```
+
+Or run without installing:
+
+```bash
+npx stack-lift migrate ./my-project
+```
+
+**Requirements:** Node.js ≥ 18
+
+### Skill install (Claude Code)
+
+```bash
+# Install the skill into ~/.claude/skills/
 npx stack-lift skills add stacklift
 
-# Or install the CLI globally first, then use it anywhere
-npm install -g stack-lift
+# Or with the CLI already installed globally
 skills add stacklift
 ```
 
-Both commands copy the skill into `~/.claude/skills/stacklift/`. Once it's there, invoke it inside Claude Code:
+Once installed, invoke it inside Claude Code:
 
 ```
 /stacklift
 ```
 
-### Other skill commands
+#### Project-local skill install
 
-```bash
-skills list                  # show installed skills
-skills search angular        # browse available skills
-skills remove stacklift      # uninstall a skill
-skills add stacklift --dir ./custom/path   # custom install dir
-```
-
-The same sub-commands are available under the `stack-lift` binary too:
-
-```bash
-stack-lift skills add stacklift
-stack-lift skills list
-stack-lift skills search
-```
-
-### Project-local skill install
-
-To scope the skill to a single project (instead of installing it globally), install it into `.claude/skills/` inside your repo:
+To scope the skill to a single project, install it into `.claude/skills/` inside your repo:
 
 ```bash
 cd my-project
 npx stack-lift skills add stacklift --dir .claude/skills
 ```
 
-Claude Code automatically discovers skills in `.claude/skills/` when you open that project, so `/stacklift` will be available only in that workspace. Commit `.claude/skills/stacklift/` to share it with your team.
+Claude Code discovers skills in `.claude/skills/` automatically when you open the project. Commit the directory to share it with your team.
 
-> **Note:** The skill file provides AI guidance. For automated code transforms and live registry lookups, the `stack-lift` CLI also needs to be available — either installed globally (`npm install -g stack-lift`) or invokable via `npx stack-lift`. Without the CLI, Claude still reads your `package.json` directly and provides upgrade guidance, just without the automated AST fixes.
+> **Note:** The skill provides AI-guided analysis. For live registry lookups and AST transforms, the `stack-lift` CLI also needs to be available — via global install or `npx stack-lift`. Without it, Claude reads your `package.json` directly and provides guidance without the automated fixes.
 
-### Standalone CLI only
-
-**Requirements:** Node.js ≥ 18
+### Other skill commands
 
 ```bash
-npm install -g stack-lift
+skills list                              # show installed skills
+skills search angular                    # browse available skills
+skills remove stacklift                  # uninstall
+skills add stacklift --dir ./custom      # custom install dir
+
+stack-lift skills add stacklift          # same, via main binary
 ```
 
-Or build from source:
+### Build from source
 
 ```bash
 git clone https://github.com/gorde-ganesh/stack-lift
@@ -109,65 +110,204 @@ npm install && npm run build && npm link
 
 ## Usage
 
-### CLI
+### Interactive guided migration (recommended)
 
 ```bash
-# Detect stack and list outdated packages (queries live npm registry)
+stack-lift migrate ./my-project
+```
+
+Runs a step-by-step guided session — see [Interactive migrate flow](#interactive-migrate-flow) below.
+
+### Non-interactive commands
+
+```bash
+# Detect stack and list outdated packages
 stack-lift analyze ./my-project
 
-# Show the upgrade path and risk level without writing anything
+# Show the upgrade path without full analysis
 stack-lift plan ./my-project --to 18
 
 # Full upgrade report in the terminal
 stack-lift upgrade ./my-project --to 18
 
-# Write a Markdown report to UPGRADE_REPORT.md
-stack-lift upgrade ./my-project --to 18 --output markdown
+# Write markdown and JSON reports to ./stacklift-output/
+stack-lift upgrade ./my-project --to 18 --output markdown,json
 
-# Write a machine-readable JSON report
-stack-lift upgrade ./my-project --to 18 --output json
+# Write to a custom directory
+stack-lift upgrade ./my-project --to 18 --output markdown,json --out-dir ./reports
 
-# Apply automated AST-based code fixes in-place
+# Apply automated AST-based fixes in-place
 stack-lift upgrade ./my-project --to 18 --apply
-
-# Preview what automated fixes would change, without writing any files
-stack-lift upgrade ./my-project --to 18 --apply --dry-run
 ```
 
 ### AI Skill (Claude Code)
 
 ```
 /stacklift
-
-> Project path: ./my-angular-app
-> Target version: 18
 ```
 
-Claude will run the full analysis workflow and stream results back with inline code examples, a manual-action checklist, and a risk assessment.
+Claude runs the full analysis workflow and streams results with inline code examples, a manual-action checklist, and a risk assessment. It reads actual project files — not a description of them.
 
 ---
 
-## Supported Frameworks
+## Interactive migrate flow
 
-### Phase 1 (current)
+`stack-lift migrate` runs a four-phase guided session:
 
-| Framework  | Versions covered                                          |
-|------------|----------------------------------------------------------|
-| Angular    | 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18              |
-| React      | 16 → 17 → 18 → 19                                        |
-| TypeScript | 4.x → 5.x                                                |
+```
+stack-lift migrate ./my-angular-app
+```
+
+### Phase 1 — Discovery
+
+Scans the project and shows what was found:
+
+```
+◆ Phase 1 — Discovery
+  Framework      Angular 16.2.12
+  TypeScript     4.9.5 (strict mode off)
+  RxJS           7.5.0
+  Build tool     Angular CLI
+  Pkg manager    npm
+  Lockfile       parsed (exact versions)
+```
+
+### Phase 2 — Intent
+
+```
+Migration objective?
+❯ Minimal risk — just make the build pass, touch as little as possible
+  Security cleanup — remove vulnerable and deprecated packages first
+  Modernization — best practices, standalone components, strict types
+  Performance — move to Vite/esbuild, reduce bundle size
+  Full migration — do everything: framework, deps, tooling, patterns
+
+Target Angular version?
+❯ Angular 17 — lower risk, 1 hop
+  Angular 18 (recommended stable) — moderate, 2 hops
+  Angular 19 — higher effort, 3 hops
+  Angular 20 — higher effort, 4 hops
+```
+
+### Phase 3 — Analysis
+
+Queries the npm registry, detects peer conflicts, and shows findings before asking to continue:
+
+```
+✔ Found 6 outdated package(s), 2 peer conflict(s)
+
+  Deprecated packages (3):
+  ● codelyzer 6.0.2 — Deprecated. Use angular-eslint instead.
+  ● tslint 5.20.1 — Deprecated Jan 2020. Migrate to ESLint + @typescript-eslint.
+  ● node-sass 6.0.1 — Deprecated. Use sass (Dart Sass) instead.
+
+  Peer conflicts (2):
+  ● primeng 13.4.2 does not satisfy ^16.0.0 required by @angular/core
+```
+
+### Phase 4 — Decisions
+
+For each deprecated package, shows replacement options with API similarity, effort, and source occurrence count:
+
+```
+⚠ codelyzer — deprecated. Use angular-eslint instead.
+  found in 0 locations (transitive only)
+
+Replace codelyzer with?
+❯ @angular-eslint/eslint-plugin — Official replacement, drop-in for most rules
+                                  [API similar] effort: low
+  Keep codelyzer temporarily
+
+Create a backup before starting?
+❯ Create a git branch (git checkout -b upgrade/stack-lift)
+  Create a git tag (git tag pre-upgrade-backup)
+  No backup — I will manage it myself
+
+Generate artifacts
+❯ ◉ Markdown report
+  ◉ JSON report (for CI / tooling)
+
+Output directory
+> ./stacklift-output
+```
+
+### Confirmation and execution
+
+```
+  Objective   minimal-risk
+  Target      Angular 17
+  Backup      branch
+  Output      markdown, json → ./stacklift-output
+  Replace     codelyzer → @angular-eslint/eslint-plugin
+              node-sass → sass
+  Defer       tslint
+
+Generate plan and write artifacts? (Y/n)
+```
+
+Then executes: git backup → plan generation → source scan → artifact write → checklist.
+
+### Session resumability
+
+Progress is saved to `.stacklift/session.json` after each phase. If you exit mid-session, re-running `stack-lift migrate` offers to resume where you left off.
+
+### Artifacts
+
+Reports are written to the output directory with versioned filenames:
+
+```
+./stacklift-output/
+  stacklift-report-angular-16.2.12-to-17.md
+  stacklift-report-angular-16.2.12-to-17.json
+```
+
+Each report includes:
+- Evidence sources table (what was read from files vs inferred vs live registry)
+- Peer dependency conflict table
+- Per-step breaking changes with official Angular/React migration guide links
+- Effort estimate with its basis (breaking change count, not LOC)
+- Detected code issues with file:line locations
+- Manual action checklist
+- Rollback plan
+
+---
+
+## Supported frameworks
+
+### Current (v0.2)
+
+| Framework  | Upgrade path covered                                              |
+|------------|------------------------------------------------------------------|
+| Angular    | 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20           |
+| React      | 16 → 17 → 18 → 19                                               |
+| TypeScript | 4.x → 5.x                                                       |
 
 ### Detected build tooling
 
 Webpack, Vite, Parcel, Rollup, Create React App, Angular CLI
 
+### Package replacements
+
+StackLift knows alternatives for these deprecated packages and presents them as interactive choices:
+
+| Deprecated | Alternatives offered |
+|------------|----------------------|
+| `moment` | dayjs, date-fns, luxon |
+| `protractor` | @playwright/test, cypress, webdriverio |
+| `codelyzer` | @angular-eslint/eslint-plugin |
+| `tslint` | eslint + @typescript-eslint |
+| `node-sass` | sass (Dart Sass) |
+| `react-scripts` | vite, next.js |
+| `request` | axios, got, node-fetch |
+| `babel-core` | @babel/core |
+
 ### Monorepo detection
 
-StackLift automatically detects monorepo layouts and warns you to analyze each workspace package individually. Detected via: `workspaces` in `package.json`, `pnpm-workspace.yaml`, `lerna.json`, `nx.json`, `turbo.json`.
+Detected via: `workspaces` in `package.json`, `pnpm-workspace.yaml`, `lerna.json`, `nx.json`, `turbo.json`. Root-level shared dependencies are flagged separately from per-project dependencies.
 
-### Phase 2 (planned)
+### Planned (v0.3+)
 
-Node.js, Express, NestJS, Next.js, Nuxt, Vue, Svelte
+Node.js, Express, NestJS, Next.js (full), Nuxt, Vue, Svelte
 
 ---
 
@@ -176,29 +316,33 @@ Node.js, Express, NestJS, Next.js, Nuxt, Vue, Svelte
 ```
 stack-lift/
 ├── src/
-│   ├── cli.ts                           # Commander CLI entry point
+│   ├── cli.ts                           # Commander CLI — migrate / upgrade / analyze / plan
 │   ├── index.ts                         # Public library API
 │   ├── types/
 │   │   └── index.ts                     # Shared TypeScript types
 │   ├── knowledge/
-│   │   ├── angular.ts                   # Angular breaking changes per major hop
-│   │   ├── react.ts                     # React breaking changes per major hop
+│   │   ├── angular.ts                   # Breaking changes per hop (v10–v20) + reference URLs
+│   │   ├── react.ts                     # React breaking changes per hop
+│   │   ├── replacements.ts              # Deprecated package alternatives metadata
 │   │   └── typescript.ts               # TypeScript upgrade notes
 │   └── engines/
-│       ├── stack-detector.ts            # Reads project files → StackInfo
-│       ├── npm-registry.ts              # Live npm registry client with cache
-│       ├── dependency-analyzer.ts       # Compares installed vs latest/deprecated
-│       ├── upgrade-planner.ts           # Builds safe incremental upgrade path
-│       ├── breaking-change-analyzer.ts  # Scans source for affected patterns
-│       ├── refactor-engine.ts           # AST-based automated code transforms
+│       ├── interaction.ts               # Interactive migrate flow (@inquirer/prompts)
+│       ├── session.ts                   # .stacklift/session.json resumability
+│       ├── artifact-writer.ts           # Writes versioned markdown/JSON to output dir
+│       ├── stack-detector.ts            # Reads project files → StackInfo (incl. lockfile + tsconfig)
+│       ├── npm-registry.ts              # Live npm registry client with cache + peer dep capture
+│       ├── dependency-analyzer.ts       # Outdated/deprecated packages + peer conflict detection
+│       ├── upgrade-planner.ts           # Safe incremental upgrade path with effort basis
+│       ├── breaking-change-analyzer.ts  # Source file scan for affected patterns
+│       ├── refactor-engine.ts           # AST transforms via ts-morph
 │       ├── path-guard.ts                # Path traversal security guard
-│       ├── doc-generator.ts             # Renders markdown/JSON reports
+│       ├── doc-generator.ts             # Markdown/JSON report renderer
 │       └── orchestrator.ts             # Wires all engines into runUpgrade()
 ├── skills/
 │   └── stacklift/
-│       ├── SKILL.md                     # skills.sh skill definition
+│       ├── SKILL.md                     # Claude Code skill definition
 │       ├── examples/                    # Worked upgrade examples
-│       └── templates/                  # Reusable report templates
+│       └── templates/                  # Report templates
 └── tests/
     ├── fixtures/                        # Sample project package.json files
     └── *.test.ts                        # Unit tests (vitest)
@@ -209,39 +353,48 @@ stack-lift/
 ```
 User project
     ↓
-stack-detector        — framework, version, build tool, package manager, monorepo
+stack-detector        — framework, version, build tool, package manager,
+                        lockfile (resolved versions), tsconfig compiler options
     ↓
-npm-registry          — live latest/deprecated data (5-min cache, offline fallback)
+npm-registry          — live latest/deprecated/peerDependencies (5-min cache, offline fallback)
     ↓
-dependency-analyzer   — outdated / deprecated packages, risk levels
+dependency-analyzer   — outdated packages, peer conflict detection, evidence tagging
     ↓
-upgrade-planner       — incremental version path, total breaking changes
+upgrade-planner       — incremental version path, effort estimate with basis
     ↓
-breaking-change-analyzer  — source file locations needing attention
+breaking-change-analyzer  — source file locations (file:line) needing attention
     ↓
 refactor-engine       — AST transforms via ts-morph (optional --apply)
     ↓
-doc-generator         — markdown / JSON / terminal output
+artifact-writer       — versioned markdown + JSON to output directory
 ```
 
-### Live npm registry
+### Evidence model
 
-The dependency analyzer queries `registry.npmjs.org` for every package in your `package.json`:
+Every claim in a StackLift report is tagged with how it was established:
 
-- Results are cached in-process for 5 minutes
-- Each request has a 4-second timeout with `AbortController`
-- If the registry is unreachable, a built-in `KNOWN_DEPRECATED` map provides offline fallback for common packages (tslint, node-sass, react-scripts, moment, etc.)
+| Tag | Meaning |
+|-----|---------|
+| **Observed** | Read directly from a file (package.json version, tsconfig option, lockfile entry) |
+| **Registry** | Fetched from the live npm registry during this run |
+| **Inferred** | Derived from a static rule — always shown with the rule |
+
+Reports include a lockfile status indicator. If no lockfile was found, version numbers come from package.json ranges and may not match what is actually installed.
+
+### Peer dependency detection
+
+For each package, StackLift fetches the `peerDependencies` declared by its latest version and checks them against your installed packages. Conflicts are surfaced in the Phase 3 analysis and in the written report — before any upgrade steps are recommended.
 
 ### AST-based refactors
 
-Automated code fixes use [ts-morph](https://ts-morph.com/) to manipulate the TypeScript/JavaScript AST directly — never regex on raw source text. Supported transforms:
+Automated code fixes use [ts-morph](https://ts-morph.com/) to manipulate the AST — not raw text. Supported transforms:
 
 | Pattern | Transform |
 |---------|-----------|
 | `TestBed.get(T)` | → `TestBed.inject(T)` |
 | `ReactDOM.render(<App />, el)` | → `createRoot(el).render(<App />)` |
 | `ReactDOM.hydrate(jsx, el)` | → `hydrateRoot(el, jsx)` |
-| `import { HttpModule } from '@angular/http'` | → `@angular/common/http` with `HttpClientModule` |
+| `import { HttpModule } from '@angular/http'` | → `HttpClientModule` from `@angular/common/http` |
 | `initialNavigation: 'enabled'` | → `'enabledBlocking'` |
 
 ### Security
@@ -250,39 +403,31 @@ All project paths are validated by `path-guard.ts` before any filesystem access.
 
 ---
 
-## Example Workflows
+## Example workflows
 
-### Angular 12 → 18
+### Guided migration — Angular 16 → 18
 
 ```bash
-stack-lift upgrade ./my-angular-app --to 18 --output markdown
+stack-lift migrate ./my-angular-app
 ```
 
-Output: `UPGRADE_REPORT.md` containing:
+Session flow: choose objective → choose target version → review findings → pick replacements for deprecated packages → confirm → artifacts written.
 
-- 6-step incremental plan (12 → 13 → 14 → 15 → 16 → 17 → 18)
-- 18 breaking changes across all steps
-- 5 automated fixes (TestBed.get, initialNavigation, control-flow syntax)
-- Per-step npm install commands
-- Manual action checklist
-- Rollback instructions
+### Non-interactive report
 
-### React 17 → 18
+```bash
+stack-lift upgrade ./my-angular-app --to 18 --output markdown,json
+```
+
+Writes to `./stacklift-output/stacklift-report-angular-*.md` and `.json`.
+
+### React 17 → 18 with auto-fixes
 
 ```bash
 stack-lift upgrade ./my-react-app --to 18 --apply
 ```
 
-Automatically rewrites:
-
-- `ReactDOM.render(<App />, el)` → `createRoot(el).render(<App />)`
-- `ReactDOM.hydrate(...)` → `hydrateRoot(...)`
-
-Flags for manual attention:
-
-- Automatic batching behavior changes
-- `StrictMode` double-effect invocation
-- `unmountComponentAtNode` deprecation
+Automatically rewrites `ReactDOM.render` → `createRoot`, `ReactDOM.hydrate` → `hydrateRoot`. Flags batching behavior changes and StrictMode double-invocation for manual review.
 
 ### Dependency audit only
 
@@ -290,24 +435,22 @@ Flags for manual attention:
 stack-lift analyze ./legacy-app
 ```
 
-Flags in seconds (querying the live npm registry):
-
-- `tslint` — deprecated, migrate to `@typescript-eslint`
-- `node-sass` — deprecated, replace with `sass` (Dart Sass)
-- `react-scripts` — unmaintained, migrate to Vite or Next.js
-- `moment` — maintenance mode, consider `date-fns` or `day.js`
+Queries the live npm registry and reports peer conflicts alongside outdated packages in seconds.
 
 ---
 
 ## Contributing
 
-Contributions are welcome. The most valuable additions are:
+Contributions are welcome. High-value additions:
 
 **Knowledge base entries** (`src/knowledge/`)
-Adding breaking changes for framework versions not yet covered. Each entry needs: `api`, `description`, `before`/`after` examples, `automated` flag, `severity`, `searchPattern`.
+Breaking changes for framework versions not yet covered. Each entry needs: `api`, `description`, `before`/`after` examples, `automated` flag, `severity`, `searchPattern`, and `referenceUrl`.
+
+**Package replacement entries** (`src/knowledge/replacements.ts`)
+New deprecated packages with structured alternatives: `name`, `apiSimilarity`, `migrationEffort`, `bundleNote`, `notes`.
 
 **Automated refactor patterns** (`src/engines/refactor-engine.ts`)
-AST transforms using ts-morph for known automated migrations. Add a new function following the `replaceTestBedGet` pattern and register it in `TRANSFORM_MAP`.
+AST transforms using ts-morph. Add a new function following the `replaceTestBedGet` pattern and register it in `TRANSFORM_MAP`.
 
 **New framework support**
 Vue, Nuxt, Next.js, Svelte, NestJS — follow the Angular/React pattern in `src/knowledge/`.
@@ -318,9 +461,9 @@ Vue, Nuxt, Next.js, Svelte, NestJS — follow the Angular/React pattern in `src/
 git clone https://github.com/gorde-ganesh/stack-lift
 cd stack-lift
 npm install
-npm test            # 23 unit tests
-npm run build       # tsup → dist/
-npm run dev -- upgrade ./path/to/project --to 18
+npm test              # 23 unit tests
+npm run build         # tsup → dist/
+npm run dev -- migrate ./path/to/project
 ```
 
 ### Quality checks
@@ -333,8 +476,6 @@ npm test              # Vitest unit tests
 npm run build         # tsup ESM + DTS build
 npm pack --dry-run    # Validate package contents
 ```
-
-CI runs all of the above across Node.js 18, 20, and 22 on every push and pull request.
 
 ---
 
