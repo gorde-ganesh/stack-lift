@@ -7,6 +7,7 @@ import { runUpgrade } from './engines/orchestrator.js';
 import { detectStack } from './engines/stack-detector.js';
 import { analyzeDependencies } from './engines/dependency-analyzer.js';
 import { planUpgrade } from './engines/upgrade-planner.js';
+import { installSkill, removeSkill, listSkills, searchSkills } from './skills/manager.js';
 import type { UpgradeReport, RiskLevel } from './types/index.js';
 
 const require = createRequire(import.meta.url);
@@ -246,6 +247,45 @@ program
       console.error(chalk.red(String(err)));
       process.exit(1);
     }
+  });
+
+// ── skills sub-commands ─────────────────────────────────────────────────────
+
+const skillsCmd = program
+  .command('skills')
+  .description('Manage Claude Code skills');
+
+skillsCmd
+  .command('add <skill>')
+  .description('Install a skill into ~/.claude/skills/')
+  .option('--dir <path>', 'Override the skills installation directory')
+  .action(async (skill: string, options: { dir?: string }) => {
+    await installSkill(skill, options.dir);
+  });
+
+skillsCmd
+  .command('remove <skill>')
+  .aliases(['rm', 'uninstall'])
+  .description('Remove an installed skill')
+  .option('--dir <path>', 'Override the skills directory')
+  .action((skill: string, options: { dir?: string }) => {
+    removeSkill(skill, options.dir);
+  });
+
+skillsCmd
+  .command('list')
+  .alias('ls')
+  .description('List installed skills')
+  .option('--dir <path>', 'Override the skills directory')
+  .action((options: { dir?: string }) => {
+    listSkills(options.dir);
+  });
+
+skillsCmd
+  .command('search [query]')
+  .description('Browse available skills')
+  .action((query?: string) => {
+    searchSkills(query);
   });
 
 program.parse(process.argv);

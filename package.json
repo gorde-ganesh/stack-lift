@@ -4,7 +4,8 @@
   "description": "AI-powered upgrade assistant for modernizing Angular, React, and legacy frontend codebases",
   "type": "module",
   "bin": {
-    "stack-lift": "./dist/cli.js"
+    "stack-lift": "./dist/cli.js",
+    "skills": "./dist/skills-cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,7 +24,8 @@
     "prepublishOnly": "npm run build"
   },
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "dependencies": {
     "chalk": "^5.3.0",
