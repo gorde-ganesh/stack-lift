@@ -76,6 +76,19 @@ stack-lift skills list
 stack-lift skills search
 ```
 
+### Project-local skill install
+
+To scope the skill to a single project (instead of installing it globally), install it into `.claude/skills/` inside your repo:
+
+```bash
+cd my-project
+npx stack-lift skills add stacklift --dir .claude/skills
+```
+
+Claude Code automatically discovers skills in `.claude/skills/` when you open that project, so `/stacklift` will be available only in that workspace. Commit `.claude/skills/stacklift/` to share it with your team.
+
+> **Note:** The skill file provides AI guidance. For automated code transforms and live registry lookups, the `stack-lift` CLI also needs to be available — either installed globally (`npm install -g stack-lift`) or invokable via `npx stack-lift`. Without the CLI, Claude still reads your `package.json` directly and provides upgrade guidance, just without the automated AST fixes.
+
 ### Standalone CLI only
 
 **Requirements:** Node.js ≥ 18
