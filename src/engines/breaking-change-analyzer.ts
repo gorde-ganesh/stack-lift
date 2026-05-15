@@ -29,10 +29,7 @@ function collectSourceFiles(dir: string): string[] {
   return files;
 }
 
-function searchFile(
-  filePath: string,
-  change: BreakingChange
-): CodeSuggestion[] {
+function searchFile(filePath: string, change: BreakingChange): CodeSuggestion[] {
   if (!change.searchPattern) return [];
 
   let content: string;
@@ -46,12 +43,13 @@ function searchFile(
   const lines = content.split('\n');
 
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes(change.searchPattern)) {
+    const line = lines[i];
+    if (line?.includes(change.searchPattern)) {
       suggestions.push({
         file: filePath,
         line: i + 1,
         change,
-        matchedText: lines[i].trim(),
+        matchedText: line.trim(),
       });
     }
   }
@@ -59,10 +57,7 @@ function searchFile(
   return suggestions;
 }
 
-export function analyzeBreakingChanges(
-  projectPath: string,
-  plan: UpgradePlan
-): CodeSuggestion[] {
+export function analyzeBreakingChanges(projectPath: string, plan: UpgradePlan): CodeSuggestion[] {
   const allChanges = plan.steps.flatMap((s) => s.breakingChanges);
   const searchableChanges = allChanges.filter((c) => c.searchPattern);
 

@@ -1,157 +1,290 @@
 import * as fs from 'node:fs';
+import { Project, SyntaxKind, Node, SourceFile } from 'ts-morph';
 import type { CodeSuggestion, RefactorResult } from '../types/index.js';
 
-interface Replacement {
-  pattern: RegExp;
-  replacement: string;
-  description: string;
+export interface RefactorOptions {
+  /** If true, compute diffs but do not write any files. */
+  dryRun?: boolean;
 }
 
-// Automated text-based replacements keyed by BreakingChange.api
-const AUTOMATED_REPLACEMENTS: Record<string, Replacement[]> = {
-  'HttpModule': [
-    {
-      pattern: /import\s*\{([^}]*)HttpModule([^}]*)\}\s*from\s*['"]@angular\/http['"]/g,
-      replacement: "import {$1HttpClientModule$2} from '@angular/common/http'",
-      description: "Replace HttpModule import with HttpClientModule",
-    },
-    {
-      pattern: /\bHttpModule\b/g,
-      replacement: 'HttpClientModule',
-      description: 'Replace HttpModule usage with HttpClientModule',
-    },
-  ],
+export interface TransformResult {
+  description: string;
+  before?: string;
+  after?: string;
+}
 
-  'TestBed.get()': [
-    {
-      pattern: /TestBed\.get\(/g,
-      replacement: 'TestBed.inject(',
-      description: 'Replace TestBed.get() with TestBed.inject()',
-    },
-  ],
+// ── Individual AST transforms ────────────────────────────────────────────────
 
-  "initialNavigation router option": [
-    {
-      pattern: /initialNavigation:\s*['"]enabled['"]/g,
-      replacement: "initialNavigation: 'enabledBlocking'",
-      description: "Replace initialNavigation: 'enabled' with 'enabledBlocking'",
-    },
-  ],
-
-  'ReactDOM.render': [
-    {
-      // Replace: import ReactDOM from 'react-dom' → add 'react-dom/client' import
-      pattern: /ReactDOM\.render\(\s*(<[\s\S]*?>|\([^)]*\)),\s*([^)]+)\)/g,
-      replacement: 'createRoot($2).render($1)',
-      description: 'Replace ReactDOM.render() with createRoot().render()',
-    },
-  ],
-
-  'ReactDOM.hydrate': [
-    {
-      pattern: /ReactDOM\.hydrate\(\s*(<[\s\S]*?>|\([^)]*\)),\s*([^)]+)\)/g,
-      replacement: 'hydrateRoot($2, $1)',
-      description: 'Replace ReactDOM.hydrate() with hydrateRoot()',
-    },
-  ],
-
-  'React import for JSX': [
-    {
-      pattern: /^import React from ['"]react['"];?\n/m,
-      replacement: '',
-      description: 'Remove unused React import (new JSX transform)',
-    },
-    {
-      pattern: /^import React, \{/m,
-      replacement: 'import {',
-      description: 'Remove default React import, keep named imports',
-    },
-  ],
-
-  '*ngIf structural directive': [
-    {
-      // Simple *ngIf="expr" → @if (expr) { ... } is too complex for regex;
-      // flag the occurrences instead and let the Angular migration schematic handle it
-      pattern: /\*ngIf=/g,
-      replacement: '*ngIf=',
-      description: 'Run ng g @angular/core:control-flow to migrate *ngIf to @if',
-    },
-  ],
-};
-
-function applyReplacementsToFile(
-  filePath: string,
-  apiName: string
-): { changed: boolean; descriptions: string[] } {
-  const replacements = AUTOMATED_REPLACEMENTS[apiName];
-  if (!replacements) return { changed: false, descriptions: [] };
-
-  let content: string;
-  try {
-    content = fs.readFileSync(filePath, 'utf-8');
-  } catch {
-    return { changed: false, descriptions: [] };
-  }
-
-  const original = content;
-  const applied: string[] = [];
-
-  for (const r of replacements) {
-    const next = content.replace(r.pattern, r.replacement);
-    if (next !== content) {
-      content = next;
-      applied.push(r.description);
+function replaceTestBedGet(source: SourceFile): TransformResult[] {
+  const applied: TransformResult[] = [];
+  for (const call of source.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const expr = call.getExpression();
+    if (
+      Node.isPropertyAccessExpression(expr) &&
+      expr.getExpression().getText() === 'TestBed' &&
+      expr.getName() === 'get'
+    ) {
+      const before = call.getText();
+      expr.getNameNode().replaceWithText('inject');
+      applied.push({
+        description: 'Replace TestBed.get() with TestBed.inject()',
+        before,
+        after: call.getText(),
+      });
     }
   }
-
-  if (content !== original) {
-    fs.writeFileSync(filePath, content, 'utf-8');
-    return { changed: true, descriptions: applied };
-  }
-
-  return { changed: false, descriptions: [] };
+  return applied;
 }
 
-export function applyRefactors(suggestions: CodeSuggestion[]): RefactorResult[] {
-  // Group suggestions by file
-  const byFile = new Map<string, CodeSuggestion[]>();
+function replaceReactDOMRender(source: SourceFile): TransformResult[] {
+  const applied: TransformResult[] = [];
+
+  for (const call of source.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const expr = call.getExpression();
+    if (!Node.isPropertyAccessExpression(expr) || expr.getName() !== 'render') continue;
+
+    const obj = expr.getExpression();
+    if (obj.getText() !== 'ReactDOM') continue;
+
+    const args = call.getArguments();
+    if (args.length < 2) continue;
+    const arg0 = args[0];
+    const arg1 = args[1];
+    if (!arg0 || !arg1) continue;
+
+    const before = call.getText();
+    const jsx = arg0.getText();
+    const container = arg1.getText();
+    call.replaceWithText(`createRoot(${container}).render(${jsx})`);
+
+    applied.push({
+      description: 'Replace ReactDOM.render() with createRoot().render()',
+      before,
+      after: `createRoot(${container}).render(${jsx})`,
+    });
+  }
+
+  // Add createRoot import if we made any replacements
+  if (applied.length > 0) {
+    ensureNamedImport(source, 'react-dom/client', 'createRoot');
+    removeNamedImport(source, 'react-dom', 'render');
+  }
+
+  return applied;
+}
+
+function replaceReactDOMHydrate(source: SourceFile): TransformResult[] {
+  const applied: TransformResult[] = [];
+
+  for (const call of source.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const expr = call.getExpression();
+    if (!Node.isPropertyAccessExpression(expr) || expr.getName() !== 'hydrate') continue;
+
+    if (expr.getExpression().getText() !== 'ReactDOM') continue;
+
+    const args = call.getArguments();
+    if (args.length < 2) continue;
+    const arg0 = args[0];
+    const arg1 = args[1];
+    if (!arg0 || !arg1) continue;
+
+    const before = call.getText();
+    const jsx = arg0.getText();
+    const container = arg1.getText();
+    call.replaceWithText(`hydrateRoot(${container}, ${jsx})`);
+
+    applied.push({
+      description: 'Replace ReactDOM.hydrate() with hydrateRoot()',
+      before,
+      after: `hydrateRoot(${container}, ${jsx})`,
+    });
+  }
+
+  if (applied.length > 0) {
+    ensureNamedImport(source, 'react-dom/client', 'hydrateRoot');
+  }
+
+  return applied;
+}
+
+function replaceHttpModule(source: SourceFile): TransformResult[] {
+  const applied: TransformResult[] = [];
+
+  for (const decl of source.getDescendantsOfKind(SyntaxKind.ImportDeclaration)) {
+    const moduleSpec = decl.getModuleSpecifierValue();
+    if (moduleSpec !== '@angular/http') continue;
+
+    const before = decl.getText();
+    decl.setModuleSpecifier('@angular/common/http');
+
+    const named = decl.getNamedImports();
+    for (const imp of named) {
+      if (imp.getName() === 'HttpModule') {
+        imp.setName('HttpClientModule');
+      }
+      if (imp.getName() === 'Http') {
+        imp.setName('HttpClient');
+      }
+    }
+
+    applied.push({
+      description: 'Replace @angular/http import with @angular/common/http',
+      before,
+      after: decl.getText(),
+    });
+  }
+
+  return applied;
+}
+
+function replaceInitialNavigation(source: SourceFile): TransformResult[] {
+  const applied: TransformResult[] = [];
+
+  for (const literal of source.getDescendantsOfKind(SyntaxKind.StringLiteral)) {
+    if (literal.getLiteralValue() !== 'enabled') continue;
+
+    const parent = literal.getParent();
+    if (!Node.isPropertyAssignment(parent)) continue;
+    if (parent.getName() !== 'initialNavigation') continue;
+
+    const before = literal.getText();
+    literal.replaceWithText("'enabledBlocking'");
+
+    applied.push({
+      description: "Replace initialNavigation: 'enabled' with 'enabledBlocking'",
+      before,
+      after: "'enabledBlocking'",
+    });
+  }
+
+  return applied;
+}
+
+// ── Import helpers ───────────────────────────────────────────────────────────
+
+function ensureNamedImport(source: SourceFile, module: string, name: string): void {
+  const existing = source.getImportDeclaration((d) => d.getModuleSpecifierValue() === module);
+  if (existing) {
+    const names = existing.getNamedImports().map((n) => n.getName());
+    if (!names.includes(name)) {
+      existing.addNamedImport(name);
+    }
+  } else {
+    source.addImportDeclaration({ moduleSpecifier: module, namedImports: [name] });
+  }
+}
+
+function removeNamedImport(source: SourceFile, module: string, name: string): void {
+  const decl = source.getImportDeclaration((d) => d.getModuleSpecifierValue() === module);
+  if (!decl) return;
+
+  const named = decl.getNamedImports();
+  const target = named.find((n) => n.getName() === name);
+  if (!target) return;
+
+  if (named.length === 1) {
+    decl.remove();
+  } else {
+    target.remove();
+  }
+}
+
+// ── Transform dispatch ───────────────────────────────────────────────────────
+
+const TRANSFORM_MAP: Record<string, (s: SourceFile) => TransformResult[]> = {
+  'TestBed.get()': replaceTestBedGet,
+  'ReactDOM.render': replaceReactDOMRender,
+  'ReactDOM.hydrate': replaceReactDOMHydrate,
+  HttpModule: replaceHttpModule,
+  'initialNavigation router option': replaceInitialNavigation,
+};
+
+export function hasAutomatedFix(apiName: string): boolean {
+  return apiName in TRANSFORM_MAP;
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+export function applyRefactors(
+  suggestions: CodeSuggestion[],
+  options: RefactorOptions = {},
+): RefactorResult[] {
+  const { dryRun = false } = options;
+
+  // Group suggestions by file and collect unique automated APIs
+  const byFile = new Map<string, Set<string>>();
   for (const s of suggestions) {
-    const list = byFile.get(s.file) ?? [];
-    list.push(s);
-    byFile.set(s.file, list);
+    if (!s.change.automated) continue;
+    const apis = byFile.get(s.file) ?? new Set<string>();
+    apis.add(s.change.api);
+    byFile.set(s.file, apis);
+  }
+
+  if (byFile.size === 0) return [];
+
+  // Build a ts-morph project over the affected files only
+  const project = new Project({
+    compilerOptions: { allowJs: true, skipLibCheck: true },
+    skipAddingFilesFromTsConfig: true,
+  });
+
+  for (const filePath of byFile.keys()) {
+    if (fs.existsSync(filePath)) {
+      project.addSourceFileAtPath(filePath);
+    }
   }
 
   const results: RefactorResult[] = [];
 
-  for (const [file, fileSuggestions] of byFile) {
-    // Only process automated changes
-    const automated = fileSuggestions.filter((s) => s.change.automated);
-    if (automated.length === 0) continue;
+  for (const sourceFile of project.getSourceFiles()) {
+    const filePath = sourceFile.getFilePath();
+    const apis = byFile.get(filePath);
+    if (!apis) continue;
 
-    // Deduplicate by API name within a file
-    const seenApis = new Set<string>();
-    const appliedSuggestions: string[] = [];
+    const originalText = sourceFile.getFullText();
+    const originalSuggestions = suggestions.filter((s) => s.file === filePath);
+    const applied: string[] = [];
 
-    for (const s of automated) {
-      if (seenApis.has(s.change.api)) continue;
-      seenApis.add(s.change.api);
-
-      const { changed, descriptions } = applyReplacementsToFile(file, s.change.api);
-      if (changed) appliedSuggestions.push(...descriptions);
+    for (const api of apis) {
+      const transform = TRANSFORM_MAP[api];
+      if (!transform) continue;
+      const transforms = transform(sourceFile);
+      applied.push(...transforms.map((t) => t.description));
     }
 
-    if (appliedSuggestions.length > 0) {
-      results.push({ file, suggestions: fileSuggestions, ...{ appliedCount: appliedSuggestions.length } } as RefactorResult & { appliedCount: number });
-      results[results.length - 1] = {
-        file,
-        suggestions: fileSuggestions.filter((s) => s.change.automated),
-      };
+    if (applied.length === 0) continue;
+
+    const newText = sourceFile.getFullText();
+    const diff = originalText !== newText ? buildSimpleDiff(originalText, newText) : undefined;
+
+    if (!dryRun) {
+      sourceFile.saveSync();
     }
+
+    results.push({
+      file: filePath,
+      suggestions: originalSuggestions,
+      applied,
+      ...(diff !== undefined ? { diff } : {}),
+    });
   }
 
   return results;
 }
 
-export function hasAutomatedFix(apiName: string): boolean {
-  return apiName in AUTOMATED_REPLACEMENTS;
+function buildSimpleDiff(before: string, after: string): string {
+  const beforeLines = before.split('\n');
+  const afterLines = after.split('\n');
+  const out: string[] = [];
+
+  const max = Math.max(beforeLines.length, afterLines.length);
+  for (let i = 0; i < max; i++) {
+    const b = beforeLines[i];
+    const a = afterLines[i];
+    if (b === a) continue;
+    if (b !== undefined) out.push(`- ${b}`);
+    if (a !== undefined) out.push(`+ ${a}`);
+  }
+
+  return out.join('\n');
 }

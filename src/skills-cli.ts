@@ -20,15 +20,15 @@ Examples:
   $ skills list
   $ skills search angular
   $ skills remove stacklift
-`
+`,
   );
 
 program
   .command('add <skill>')
   .description('Install a skill into Claude Code (~/.claude/skills/)')
   .option('--dir <path>', 'Override the skills installation directory')
-  .action(async (skill: string, options: { dir?: string }) => {
-    await installSkill(skill, options.dir);
+  .action((skill: string, options: { dir?: string }) => {
+    installSkill(skill, options.dir);
   });
 
 program

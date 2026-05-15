@@ -14,7 +14,8 @@ const TS_UPGRADES: TypeScriptUpgradeInfo[] = [
     breakingChanges: [
       {
         api: 'const enum declarations in .d.ts',
-        description: 'isolatedModules now errors on const enum in ambient contexts in stricter scenarios',
+        description:
+          'isolatedModules now errors on const enum in ambient contexts in stricter scenarios',
         automated: false,
         severity: 'low',
         fromVersion: '4',
@@ -23,7 +24,8 @@ const TS_UPGRADES: TypeScriptUpgradeInfo[] = [
       },
       {
         api: 'Decorators (experimentalDecorators)',
-        description: 'TypeScript 5 ships stage-3 decorators; experimentalDecorators now covers legacy decorators only',
+        description:
+          'TypeScript 5 ships stage-3 decorators; experimentalDecorators now covers legacy decorators only',
         automated: false,
         severity: 'medium',
         fromVersion: '4',
@@ -40,10 +42,10 @@ const TS_UPGRADES: TypeScriptUpgradeInfo[] = [
 ];
 
 export function getTypeScriptBreakingChanges(from: string, to: string): BreakingChange[] {
-  const fromMajor = parseInt(from.split('.')[0], 10);
-  const toMajor = parseInt(to.split('.')[0], 10);
+  const fromMajor = parseInt(from.split('.')[0] ?? '0', 10);
+  const toMajor = parseInt(to.split('.')[0] ?? '0', 10);
 
   return TS_UPGRADES.filter(
-    (u) => parseInt(u.fromVersion) >= fromMajor && parseInt(u.toVersion) <= toMajor
+    (u) => parseInt(u.fromVersion) >= fromMajor && parseInt(u.toVersion) <= toMajor,
   ).flatMap((u) => u.breakingChanges);
 }

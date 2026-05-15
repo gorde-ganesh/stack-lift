@@ -1,11 +1,4 @@
-export type Framework =
-  | 'Angular'
-  | 'React'
-  | 'Vue'
-  | 'Next.js'
-  | 'Nuxt'
-  | 'Svelte'
-  | 'Unknown';
+export type Framework = 'Angular' | 'React' | 'Vue' | 'Next.js' | 'Nuxt' | 'Svelte' | 'Unknown';
 
 export type BuildTool =
   | 'Webpack'
@@ -41,6 +34,7 @@ export interface StackInfo {
   projectPath: string;
   rawDependencies: Record<string, string>;
   rawDevDependencies: Record<string, string>;
+  isMonorepo?: boolean;
 }
 
 export interface DependencyInfo {
@@ -99,6 +93,10 @@ export interface CodeSuggestion {
 export interface RefactorResult {
   file: string;
   suggestions: CodeSuggestion[];
+  /** Descriptions of changes actually applied (when --apply is used). */
+  applied?: string[];
+  /** Simple line-level diff of the change (populated in dry-run and apply modes). */
+  diff?: string;
 }
 
 export interface UpgradeReport {

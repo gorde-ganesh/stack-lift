@@ -1,4 +1,4 @@
-import type { BreakingChange, UpgradeStep } from '../types/index.js';
+import type { UpgradeStep } from '../types/index.js';
 
 const ANGULAR_STEPS: Record<string, UpgradeStep> = {
   '11-12': {
@@ -26,7 +26,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       },
       {
         api: 'HttpModule',
-        description: 'HttpModule from @angular/http is removed. Use HttpClientModule from @angular/common/http',
+        description:
+          'HttpModule from @angular/http is removed. Use HttpClientModule from @angular/common/http',
         before: "import { HttpModule } from '@angular/http';",
         after: "import { HttpClientModule } from '@angular/common/http';",
         automated: true,
@@ -137,7 +138,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
   '13-14': {
     fromVersion: '13',
     toVersion: '14',
-    description: 'Angular 14: Standalone components (developer preview), typed reactive forms, inject() function',
+    description:
+      'Angular 14: Standalone components (developer preview), typed reactive forms, inject() function',
     breakingChanges: [
       {
         api: 'FormControl strict typing',
@@ -208,7 +210,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       },
       {
         api: 'ESM-only Angular packages',
-        description: 'Angular packages are now ESM-only; CommonJS projects need build tooling adjustment',
+        description:
+          'Angular packages are now ESM-only; CommonJS projects need build tooling adjustment',
         automated: false,
         severity: 'medium',
         fromVersion: '14',
@@ -218,7 +221,7 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
     ],
     automatedFixes: 1,
     manualActions: [
-      "Run: ng update @angular/core@15 @angular/cli@15",
+      'Run: ng update @angular/core@15 @angular/cli@15',
       "Replace 'enabled' with 'enabledBlocking' in router initialNavigation option",
       'Replace DATE_PIPE_DEFAULT_TIMEZONE with DATE_PIPE_DEFAULT_OPTIONS',
     ],
@@ -236,7 +239,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
   '15-16': {
     fromVersion: '15',
     toVersion: '16',
-    description: 'Angular 16: Signals (developer preview), required inputs, inject() in guards/resolvers',
+    description:
+      'Angular 16: Signals (developer preview), required inputs, inject() in guards/resolvers',
     breakingChanges: [
       {
         api: 'CanActivate / CanDeactivate functional guards',
@@ -281,7 +285,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
   '16-17': {
     fromVersion: '16',
     toVersion: '17',
-    description: 'Angular 17: Built-in control flow (@if, @for, @switch), deferrable views (@defer), new project defaults',
+    description:
+      'Angular 17: Built-in control flow (@if, @for, @switch), deferrable views (@defer), new project defaults',
     breakingChanges: [
       {
         api: '*ngIf structural directive',
@@ -355,7 +360,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
     breakingChanges: [
       {
         api: 'zone.js optional',
-        description: 'Experimental zoneless change detection is available via provideExperimentalZonelessChangeDetection()',
+        description:
+          'Experimental zoneless change detection is available via provideExperimentalZonelessChangeDetection()',
         automated: false,
         severity: 'low',
         fromVersion: '17',
@@ -391,8 +397,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
 };
 
 export function getAngularUpgradeSteps(from: string, to: string): UpgradeStep[] {
-  const fromMajor = parseInt(from.split('.')[0], 10);
-  const toMajor = parseInt(to.split('.')[0], 10);
+  const fromMajor = parseInt(from.split('.')[0] ?? '0', 10);
+  const toMajor = parseInt(to.split('.')[0] ?? '0', 10);
 
   const steps: UpgradeStep[] = [];
   for (let v = fromMajor; v < toMajor; v++) {
