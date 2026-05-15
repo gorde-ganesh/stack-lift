@@ -176,9 +176,22 @@ Peer conflict: primeng@17 requires @angular/core >=16, installed @angular/core@1
 
 Flag with `critical` or `high`:
 
-- Any package with a known deprecation notice (tslint, codelyzer, node-sass, react-scripts, moment, @angular/http, babel-core)
+- Any package with a known deprecation notice:
+  `tslint`, `codelyzer`, `node-sass`, `react-scripts`, `moment`, `@angular/http`, `babel-core`,
+  `karma`, `jasmine-core`, `protractor`, `@angular/flex-layout`,
+  `@angular-material-components/datetime-picker`, `rxjs-compat`, `request`
 - Any package more than 2 major versions behind
 - Any peer-dependency conflict with the target framework version that cannot be resolved by upgrading the conflicting package alone
+
+**Confidence scoring** — every finding must include a confidence label:
+
+| Label | When |
+|-------|------|
+| `high` | Observed directly in a file or confirmed by npm registry metadata |
+| `medium` | Inferred from static rules or heuristics |
+| `low` | Speculative — flag explicitly and explain the basis |
+
+Never present a `low` or `medium` confidence finding as a certain fact.
 
 Flag with `medium`:
 
@@ -389,7 +402,7 @@ See `examples/` for worked migration requests:
 
 ## Limitations
 
-- **No runtime execution**: StackLift reads and analyzes files. It does not run `npm install`, `ng build`, or test suites. Validate the output with an actual build.
+- **No runtime execution (skill mode)**: This AI skill reads and analyzes files. It does not run `npm install`, `ng build`, or test suites. Use `stack-lift apply --validate` in the CLI for build validation. Validate the output with an actual build.
 - **Knowledge cutoff**: Breaking change data is current as of the knowledge base version. Always verify against official migration guides for the latest patch releases.
 - **Private packages**: Cannot analyze packages not in the npm registry.
 - **Monorepos**: When a monorepo is detected (workspaces, nx.json, lerna.json, turbo.json), note that root-level tsconfig, shared builders, and common library packages affect all projects. Analyze each workspace package's package.json independently, but flag root-level shared dependencies explicitly. Do not say "analyze each project independently" without first reading the root package.json and workspace config.

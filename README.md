@@ -16,7 +16,10 @@ It works two ways:
 - [Overview](#overview)
 - [Installation](#installation)
 - [Usage](#usage)
+- [CLI commands](#cli-commands)
 - [Interactive migrate flow](#interactive-migrate-flow)
+- [Non-interactive / CI mode](#non-interactive--ci-mode)
+- [Artifacts](#artifacts)
 - [Supported frameworks](#supported-frameworks)
 - [Architecture](#architecture)
 - [Example workflows](#example-workflows)
@@ -33,12 +36,13 @@ StackLift replaces the guesswork. It:
 
 1. **Detects** your stack — framework version, build tool, TypeScript, RxJS, package manager, lockfile, tsconfig compiler options, monorepo layout
 2. **Asks** what you actually want: minimal risk? security cleanup? full modernization?
-3. **Queries** the live npm registry for outdated and deprecated packages — with peer dependency conflict detection
+3. **Queries** the live npm registry for outdated and deprecated packages — with peer dependency conflict detection and confidence scoring
 4. **Offers choices** for deprecated packages — picks replacement options, shows API similarity and migration effort for each
 5. **Plans** a safe incremental upgrade path, never skipping a major version where doing so breaks things
 6. **Scans** your source tree to locate every file that needs attention
 7. **Applies** automated fixes using AST transforms via ts-morph
-8. **Writes** a versioned markdown report, JSON report, and per-step checklist to an output directory
+8. **Validates** the result by running install → build → test → lint
+9. **Writes** versioned markdown, JSON, `findings.json`, and `plan.json` artifacts to an output directory
 
 ---
 
@@ -118,26 +122,58 @@ stack-lift migrate ./my-project
 
 Runs a step-by-step guided session — see [Interactive migrate flow](#interactive-migrate-flow) below.
 
-### Non-interactive commands
+---
+
+## CLI commands
+
+| Command | What it does |
+|---------|-------------|
+| `stack-lift audit <path>` | Read-only findings: deprecated packages, peer conflicts, outdated deps. Evidence source and confidence score on every item. |
+| `stack-lift migrate <path>` | Full interactive guided session — asks intent, target, replacements, backup, output formats. |
+| `stack-lift plan <path>` | Generate and display the upgrade plan without full dependency analysis. |
+| `stack-lift apply <path>` | Execute the plan: apply automated AST fixes then run build validation. |
+| `stack-lift resume [path]` | Resume an interrupted `migrate` session from `.stacklift/session.json`. |
+| `stack-lift upgrade <path>` | _(legacy)_ Full report in terminal; use `migrate` or `apply` instead. |
+| `stack-lift analyze <path>` | _(legacy)_ Alias for `audit`. |
+
+### Key flags
 
 ```bash
-# Detect stack and list outdated packages
-stack-lift analyze ./my-project
+# audit
+stack-lift audit ./my-project --json --markdown --out-dir ./reports
 
-# Show the upgrade path without full analysis
-stack-lift plan ./my-project --to 18
+# migrate — interactive
+stack-lift migrate ./my-project
 
-# Full upgrade report in the terminal
-stack-lift upgrade ./my-project --to 18
+# migrate — CI / non-interactive
+stack-lift migrate ./my-project \
+  --non-interactive \
+  --target 18 \
+  --objective minimal-risk \
+  --validate \
+  --json --markdown \
+  --out-dir ./stacklift-output
 
-# Write markdown and JSON reports to ./stacklift-output/
-stack-lift upgrade ./my-project --to 18 --output markdown,json
+# migrate flags
+  -n, --non-interactive     Skip all prompts; use provided flags
+  -t, --target <version>    Target major version (e.g. 18)
+  -o, --objective <name>    minimal-risk | security | modernization | performance | full-migration
+  -y, --yes                 Auto-approve all prompts
+      --dry-run             Show what would be done; no writes, no git backup
+      --apply               Apply automated AST code fixes in-place
+      --validate            Run install → build → test → lint after planning
+      --json                Include JSON in output artifacts
+      --markdown            Include Markdown in output artifacts (default: on)
+      --out-dir <dir>       Output directory (default: ./stacklift-output)
 
-# Write to a custom directory
-stack-lift upgrade ./my-project --to 18 --output markdown,json --out-dir ./reports
+# plan — also works non-interactively
+stack-lift plan ./my-project --to 18 --json --markdown
 
-# Apply automated AST-based fixes in-place
-stack-lift upgrade ./my-project --to 18 --apply
+# apply
+stack-lift apply ./my-project --to 18 --validate
+
+# resume
+stack-lift resume ./my-project
 ```
 
 ### AI Skill (Claude Code)
@@ -191,15 +227,15 @@ Target Angular version?
 
 ### Phase 3 — Analysis
 
-Queries the npm registry, detects peer conflicts, and shows findings before asking to continue:
+Queries the npm registry, detects peer conflicts, and shows findings with confidence scores before asking to continue:
 
 ```
 ✔ Found 6 outdated package(s), 2 peer conflict(s)
 
   Deprecated packages (3):
-  ● codelyzer 6.0.2 — Deprecated. Use angular-eslint instead.
-  ● tslint 5.20.1 — Deprecated Jan 2020. Migrate to ESLint + @typescript-eslint.
-  ● node-sass 6.0.1 — Deprecated. Use sass (Dart Sass) instead.
+  ● codelyzer 6.0.2 — Deprecated. Use angular-eslint instead. [confidence: high]
+  ● tslint 5.20.1 — Deprecated Jan 2020. Migrate to ESLint + @typescript-eslint. [confidence: high]
+  ● node-sass 6.0.1 — Deprecated. Use sass (Dart Sass) instead. [confidence: high]
 
   Peer conflicts (2):
   ● primeng 13.4.2 does not satisfy ^16.0.0 required by @angular/core
@@ -249,24 +285,120 @@ Then executes: git backup → plan generation → source scan → artifact write
 
 ### Session resumability
 
-Progress is saved to `.stacklift/session.json` after each phase. If you exit mid-session, re-running `stack-lift migrate` offers to resume where you left off.
+Progress is saved to `.stacklift/session.json` after each phase. If you exit mid-session, re-running `stack-lift migrate` offers to resume. Or run:
 
-### Artifacts
+```bash
+stack-lift resume ./my-project
+```
 
-Reports are written to the output directory with versioned filenames:
+---
+
+## Non-interactive / CI mode
+
+`migrate` and `plan` work fully non-interactively for use in CI pipelines or scripts:
+
+```bash
+# Minimal-risk Angular 18 upgrade — no prompts
+stack-lift migrate ./my-project \
+  --non-interactive \
+  --target 18 \
+  --objective minimal-risk \
+  --validate \
+  --json --markdown
+
+# Security-focused upgrade with auto-fixes
+stack-lift migrate ./my-project \
+  --non-interactive \
+  --target 17 \
+  --objective security \
+  --apply \
+  --yes
+
+# Generate plan only (CI audit)
+stack-lift plan ./my-project --to 18 --json --out-dir ./ci-output
+
+# Read-only audit with machine-readable output
+stack-lift audit ./my-project --json --out-dir ./ci-output
+```
+
+In non-interactive mode:
+- Prompts are skipped entirely
+- `--objective` defaults to `minimal-risk`
+- Backup strategy defaults to `none`
+- All four artifact files are always written (`report.md`, `report.json`, `findings.json`, `plan.json`)
+
+---
+
+## Artifacts
+
+Every `migrate`, `apply`, or `audit --json/--markdown` run writes versioned files to the output directory:
 
 ```
 ./stacklift-output/
-  stacklift-report-angular-16.2.12-to-17.md
-  stacklift-report-angular-16.2.12-to-17.json
+  stacklift-report-angular-16.2.12-to-17.md    # Human-readable markdown report
+  stacklift-report-angular-16.2.12-to-17.json  # Full report as JSON
+  findings.json                                  # Structured findings (CI-readable)
+  plan.json                                      # Machine-readable upgrade plan + decisions
 ```
 
-Each report includes:
+### findings.json
+
+Evidence-based list of every finding. Designed for CI parsing and dashboard ingestion:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2025-01-15T10:30:00.000Z",
+  "summary": { "totalFindings": 8, "deprecated": 3, "outdated": 3, "peerConflicts": 2 },
+  "findings": [
+    {
+      "type": "deprecated_package",
+      "package": "moment",
+      "current": "2.29.0",
+      "latest": "2.30.1",
+      "riskLevel": "medium",
+      "riskCategory": "deprecated",
+      "confidence": "high",
+      "source": "package.json",
+      "evidence": "npm registry query",
+      "reason": "Moment.js is in maintenance-only mode."
+    }
+  ]
+}
+```
+
+### plan.json
+
+Machine-readable upgrade plan with steps, decisions, and build validation results:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "framework": "Angular",
+  "fromVersion": "16",
+  "toVersion": "17",
+  "strategy": "direct",
+  "riskLevel": "low",
+  "estimatedEffort": "1–2 hours",
+  "decisions": { "objective": "minimal-risk", "targetVersion": "17" },
+  "steps": [ ... ],
+  "buildValidation": [
+    { "step": "install", "status": "success", "durationMs": 4200 },
+    { "step": "build",   "status": "success", "durationMs": 8100 },
+    { "step": "test",    "status": "success", "durationMs": 3500 },
+    { "step": "lint",    "status": "skipped" }
+  ]
+}
+```
+
+Each markdown report includes:
 - Evidence sources table (what was read from files vs inferred vs live registry)
+- Confidence score on every dependency finding and breaking change
 - Peer dependency conflict table
 - Per-step breaking changes with official Angular/React migration guide links
 - Effort estimate with its basis (breaking change count, not LOC)
 - Detected code issues with file:line locations
+- Build validation results table
 - Manual action checklist
 - Rollback plan
 
@@ -274,7 +406,7 @@ Each report includes:
 
 ## Supported frameworks
 
-### Current (v0.2)
+### Current (v0.3)
 
 | Framework  | Upgrade path covered                                              |
 |------------|------------------------------------------------------------------|
@@ -288,24 +420,33 @@ Webpack, Vite, Parcel, Rollup, Create React App, Angular CLI
 
 ### Package replacements
 
-StackLift knows alternatives for these deprecated packages and presents them as interactive choices:
+StackLift knows alternatives for these deprecated or maintenance-mode packages and presents them as interactive choices:
 
-| Deprecated | Alternatives offered |
-|------------|----------------------|
-| `moment` | dayjs, date-fns, luxon |
-| `protractor` | @playwright/test, cypress, webdriverio |
-| `codelyzer` | @angular-eslint/eslint-plugin |
-| `tslint` | eslint + @typescript-eslint |
-| `node-sass` | sass (Dart Sass) |
-| `react-scripts` | vite, next.js |
-| `request` | axios, got, node-fetch |
-| `babel-core` | @babel/core |
+| Deprecated | Reason | Alternatives offered |
+|------------|--------|----------------------|
+| `moment` | Maintenance-only, 72KB | dayjs, date-fns, luxon |
+| `protractor` | Deprecated by Angular team 2021 | @playwright/test, cypress, webdriverio |
+| `codelyzer` | Replaced by angular-eslint | @angular-eslint/eslint-plugin |
+| `tslint` | Deprecated Jan 2020 | eslint + @typescript-eslint |
+| `node-sass` | LibSass deprecated | sass (Dart Sass) |
+| `react-scripts` | CRA unmaintained since 2023 | vite, next.js |
+| `request` | Deprecated Feb 2020 | axios, got, node-fetch |
+| `babel-core` | Replaced by @babel/core v7 | @babel/core |
+| `@angular/flex-layout` | Archived, unmaintained | CSS native, @ngbracket/ngx-layout, tailwindcss |
+| `karma` | End-of-life 2023 | @web/test-runner, jest, vitest |
+| `jasmine-core` | Angular moving away from Karma/Jasmine | jest, @web/test-runner + jasmine |
+| `lodash` | Large bundle, native JS covers most cases | Native JS, lodash-es, remeda |
+| `jquery` | DOM conflicts with SPA frameworks | Native DOM APIs, framework-native refs |
+| `@angular-material-components/datetime-picker` | Abandoned, incompatible with Angular 17+ | @dhutaryan/ngx-mat-timepicker, native Material |
+| `rxjs-compat` | Bridge for RxJS 5→6, no longer needed | rxjs pipeable operators |
+| `zone.js` | Superseded by zoneless (Angular 18+) | provideExperimentalZonelessChangeDetection() |
+| `classnames` | Superseded by smaller alternative | clsx |
 
 ### Monorepo detection
 
 Detected via: `workspaces` in `package.json`, `pnpm-workspace.yaml`, `lerna.json`, `nx.json`, `turbo.json`. Root-level shared dependencies are flagged separately from per-project dependencies.
 
-### Planned (v0.3+)
+### Planned
 
 Node.js, Express, NestJS, Next.js (full), Nuxt, Vue, Svelte
 
@@ -316,28 +457,29 @@ Node.js, Express, NestJS, Next.js (full), Nuxt, Vue, Svelte
 ```
 stack-lift/
 ├── src/
-│   ├── cli.ts                           # Commander CLI — migrate / upgrade / analyze / plan
+│   ├── cli.ts                           # Commander CLI — audit / migrate / plan / apply / resume
 │   ├── index.ts                         # Public library API
 │   ├── types/
-│   │   └── index.ts                     # Shared TypeScript types
+│   │   └── index.ts                     # Shared TypeScript types (Confidence, RiskCategory, …)
 │   ├── knowledge/
 │   │   ├── angular.ts                   # Breaking changes per hop (v10–v20) + reference URLs
 │   │   ├── react.ts                     # React breaking changes per hop
-│   │   ├── replacements.ts              # Deprecated package alternatives metadata
+│   │   ├── replacements.ts              # Deprecated package alternatives (17 entries)
 │   │   └── typescript.ts               # TypeScript upgrade notes
 │   └── engines/
-│       ├── interaction.ts               # Interactive migrate flow (@inquirer/prompts)
+│       ├── interaction.ts               # Interactive + non-interactive migrate flow
 │       ├── session.ts                   # .stacklift/session.json resumability
-│       ├── artifact-writer.ts           # Writes versioned markdown/JSON to output dir
-│       ├── stack-detector.ts            # Reads project files → StackInfo (incl. lockfile + tsconfig)
+│       ├── artifact-writer.ts           # Writes report.md, report.json, findings.json, plan.json
+│       ├── build-validator.ts           # Runs install → build → test → lint; captures results
+│       ├── stack-detector.ts            # Reads project files → StackInfo (lockfile + tsconfig)
 │       ├── npm-registry.ts              # Live npm registry client with cache + peer dep capture
-│       ├── dependency-analyzer.ts       # Outdated/deprecated packages + peer conflict detection
+│       ├── dependency-analyzer.ts       # Outdated/deprecated + peer conflicts + confidence scoring
 │       ├── upgrade-planner.ts           # Safe incremental upgrade path with effort basis
 │       ├── breaking-change-analyzer.ts  # Source file scan for affected patterns
 │       ├── refactor-engine.ts           # AST transforms via ts-morph
 │       ├── path-guard.ts                # Path traversal security guard
-│       ├── doc-generator.ts             # Markdown/JSON report renderer
-│       └── orchestrator.ts             # Wires all engines into runUpgrade()
+│       ├── doc-generator.ts             # Markdown/JSON/findings/plan report renderers
+│       └── orchestrator.ts             # Wires engines into runUpgrade()
 ├── skills/
 │   └── stacklift/
 │       ├── SKILL.md                     # Claude Code skill definition
@@ -345,7 +487,7 @@ stack-lift/
 │       └── templates/                  # Report templates
 └── tests/
     ├── fixtures/                        # Sample project package.json files
-    └── *.test.ts                        # Unit tests (vitest)
+    └── *.test.ts                        # 57 unit + integration tests (vitest)
 ```
 
 ### Engine pipeline
@@ -358,7 +500,7 @@ stack-detector        — framework, version, build tool, package manager,
     ↓
 npm-registry          — live latest/deprecated/peerDependencies (5-min cache, offline fallback)
     ↓
-dependency-analyzer   — outdated packages, peer conflict detection, evidence tagging
+dependency-analyzer   — outdated packages, peer conflict detection, confidence scoring, evidence tagging
     ↓
 upgrade-planner       — incremental version path, effort estimate with basis
     ↓
@@ -366,18 +508,20 @@ breaking-change-analyzer  — source file locations (file:line) needing attentio
     ↓
 refactor-engine       — AST transforms via ts-morph (optional --apply)
     ↓
-artifact-writer       — versioned markdown + JSON to output directory
+build-validator       — install → build → test → lint (optional --validate)
+    ↓
+artifact-writer       — report.md, report.json, findings.json, plan.json
 ```
 
 ### Evidence model
 
-Every claim in a StackLift report is tagged with how it was established:
+Every claim in a StackLift report is tagged with how it was established and a confidence score:
 
-| Tag | Meaning |
-|-----|---------|
-| **Observed** | Read directly from a file (package.json version, tsconfig option, lockfile entry) |
-| **Registry** | Fetched from the live npm registry during this run |
-| **Inferred** | Derived from a static rule — always shown with the rule |
+| Tag | Confidence | Meaning |
+|-----|-----------|---------|
+| **Observed** | high | Read directly from a file (package.json version, tsconfig option, lockfile entry) |
+| **Registry** | high | Fetched from the live npm registry during this run |
+| **Inferred** | medium | Derived from a static rule — always shown with the rule |
 
 Reports include a lockfile status indicator. If no lockfile was found, version numbers come from package.json ranges and may not match what is actually installed.
 
@@ -413,29 +557,38 @@ stack-lift migrate ./my-angular-app
 
 Session flow: choose objective → choose target version → review findings → pick replacements for deprecated packages → confirm → artifacts written.
 
-### Non-interactive report
+### CI pipeline audit
 
 ```bash
-stack-lift upgrade ./my-angular-app --to 18 --output markdown,json
+stack-lift audit ./my-angular-app --json --out-dir ./ci-reports
+# findings.json and plan.json written to ./ci-reports/
 ```
 
-Writes to `./stacklift-output/stacklift-report-angular-*.md` and `.json`.
+### Non-interactive CI migration
+
+```bash
+stack-lift migrate ./my-project \
+  --non-interactive --target 18 --objective minimal-risk \
+  --validate --json --markdown
+```
+
+Exits 0 on success; artifacts written; build validation results in `plan.json`.
 
 ### React 17 → 18 with auto-fixes
 
 ```bash
-stack-lift upgrade ./my-react-app --to 18 --apply
+stack-lift apply ./my-react-app --to 18 --validate
 ```
 
-Automatically rewrites `ReactDOM.render` → `createRoot`, `ReactDOM.hydrate` → `hydrateRoot`. Flags batching behavior changes and StrictMode double-invocation for manual review.
+Automatically rewrites `ReactDOM.render` → `createRoot`, `ReactDOM.hydrate` → `hydrateRoot`. Runs build validation afterwards. Flags batching behavior changes and StrictMode double-invocation for manual review.
 
-### Dependency audit only
+### Resume an interrupted session
 
 ```bash
-stack-lift analyze ./legacy-app
+stack-lift resume ./my-project
 ```
 
-Queries the live npm registry and reports peer conflicts alongside outdated packages in seconds.
+Loads `.stacklift/session.json`, shows saved phase and decisions, offers to continue or restart.
 
 ---
 
@@ -461,7 +614,7 @@ Vue, Nuxt, Next.js, Svelte, NestJS — follow the Angular/React pattern in `src/
 git clone https://github.com/gorde-ganesh/stack-lift
 cd stack-lift
 npm install
-npm test              # 23 unit tests
+npm test              # 57 unit + integration tests
 npm run build         # tsup → dist/
 npm run dev -- migrate ./path/to/project
 ```
@@ -472,7 +625,7 @@ npm run dev -- migrate ./path/to/project
 npm run typecheck     # tsc --noEmit (strict: noUncheckedIndexedAccess, exactOptionalPropertyTypes)
 npm run lint          # ESLint with @typescript-eslint/recommended-type-checked
 npm run format:check  # Prettier check
-npm test              # Vitest unit tests
+npm test              # Vitest unit + integration tests
 npm run build         # tsup ESM + DTS build
 npm pack --dry-run    # Validate package contents
 ```
