@@ -6,6 +6,7 @@ import { planUpgrade } from './upgrade-planner.js';
 import { analyzeBreakingChanges } from './breaking-change-analyzer.js';
 import { applyRefactors } from './refactor-engine.js';
 import { generateMarkdownReport, generateJsonReport } from './doc-generator.js';
+import { assertSafePath } from './path-guard.js';
 import type { AnalyzeOptions, UpgradeReport, StackInfo, UpgradePlan } from '../types/index.js';
 
 export interface OrchestratorResult {
@@ -18,16 +19,19 @@ export interface OrchestratorResult {
 export async function runUpgrade(options: AnalyzeOptions): Promise<OrchestratorResult> {
   const { projectPath, targetVersion, apply = false, outputFormat = 'terminal' } = options;
 
+  // Guard against path traversal before touching the filesystem
+  assertSafePath(projectPath);
+
   // 1. Detect stack
   const stack: StackInfo = detectStack(projectPath);
 
-  // 2. Analyze dependencies
-  const outdatedDependencies = analyzeDependencies(stack);
+  // 2. Analyze dependencies (async — queries npm registry with fallback)
+  const outdatedDependencies = await analyzeDependencies(stack);
 
   // 3. Plan upgrade
   const plan: UpgradePlan = planUpgrade(stack, targetVersion);
 
-  // 4. Find breaking change locations in source
+  // 4. Find breaking-change locations in source
   const codeSuggestions = analyzeBreakingChanges(projectPath, plan);
 
   // 5. Group suggestions into refactor results
@@ -42,17 +46,14 @@ export async function runUpgrade(options: AnalyzeOptions): Promise<OrchestratorR
     suggestions,
   }));
 
-  // 6. Optionally apply automated fixes
+  // 6. Optionally apply automated AST fixes
   if (apply) {
     const applied = applyRefactors(codeSuggestions);
-    // Merge applied results
-    refactorResults = applied.length > 0 ? applied : refactorResults;
+    if (applied.length > 0) refactorResults = applied;
   }
 
-  // 7. Collect all manual actions
-  const manualActions = [
-    ...new Set(plan.steps.flatMap((s) => s.manualActions)),
-  ];
+  // 7. Deduplicate manual actions across all steps
+  const manualActions = [...new Set(plan.steps.flatMap((s) => s.manualActions))];
 
   const report: UpgradeReport = {
     stack,
@@ -67,7 +68,7 @@ export async function runUpgrade(options: AnalyzeOptions): Promise<OrchestratorR
   const markdown = generateMarkdownReport(report);
   const json = generateJsonReport(report);
 
-  // 8. Write output file if markdown or json format requested
+  // 8. Write report file if a file-based output format was requested
   let outputPath: string | undefined;
   if (outputFormat === 'markdown') {
     outputPath = path.join(projectPath, 'UPGRADE_REPORT.md');
@@ -77,5 +78,5 @@ export async function runUpgrade(options: AnalyzeOptions): Promise<OrchestratorR
     fs.writeFileSync(outputPath, json, 'utf-8');
   }
 
-  return { report, markdown, json, outputPath };
+  return { report, markdown, json, ...(outputPath !== undefined ? { outputPath } : {}) };
 }

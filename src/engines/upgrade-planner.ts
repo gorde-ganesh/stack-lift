@@ -1,10 +1,17 @@
-import semver from 'semver';
-import { getAngularUpgradeSteps, getAngularLatestVersion, ANGULAR_SUPPORTED_VERSIONS } from '../knowledge/angular.js';
-import { getReactUpgradeSteps, getReactLatestVersion, REACT_SUPPORTED_VERSIONS } from '../knowledge/react.js';
+import {
+  getAngularUpgradeSteps,
+  getAngularLatestVersion,
+  ANGULAR_SUPPORTED_VERSIONS,
+} from '../knowledge/angular.js';
+import {
+  getReactUpgradeSteps,
+  getReactLatestVersion,
+  REACT_SUPPORTED_VERSIONS,
+} from '../knowledge/react.js';
 import type { StackInfo, UpgradePlan, UpgradeStep, RiskLevel } from '../types/index.js';
 
 function majorOf(version: string): string {
-  return version.split('.')[0];
+  return version.split('.')[0] ?? '';
 }
 
 function computeRisk(steps: UpgradeStep[]): RiskLevel {
@@ -44,20 +51,22 @@ function validateVersions(
   framework: string,
   fromMajor: string,
   toMajor: string,
-  supported: string[]
+  supported: string[],
 ): void {
   if (!supported.includes(fromMajor)) {
     throw new Error(
-      `${framework} v${fromMajor} is not in the supported upgrade range (${supported[0]}–${supported[supported.length - 1]})`
+      `${framework} v${fromMajor} is not in the supported upgrade range (${supported[0]}–${supported[supported.length - 1]})`,
     );
   }
   if (!supported.includes(toMajor)) {
     throw new Error(
-      `Target ${framework} v${toMajor} is not in the supported range (${supported[0]}–${supported[supported.length - 1]})`
+      `Target ${framework} v${toMajor} is not in the supported range (${supported[0]}–${supported[supported.length - 1]})`,
     );
   }
   if (parseInt(toMajor) <= parseInt(fromMajor)) {
-    throw new Error(`Target version (${toMajor}) must be greater than current version (${fromMajor})`);
+    throw new Error(
+      `Target version (${toMajor}) must be greater than current version (${fromMajor})`,
+    );
   }
 }
 
@@ -75,7 +84,9 @@ export function planUpgrade(stack: StackInfo, targetVersion?: string): UpgradePl
     validateVersions('React', fromMajor, toMajor, REACT_SUPPORTED_VERSIONS);
     steps = getReactUpgradeSteps(fromMajor, toMajor);
   } else {
-    throw new Error(`Upgrade planning for "${framework}" is not yet supported. Supported: Angular, React`);
+    throw new Error(
+      `Upgrade planning for "${framework}" is not yet supported. Supported: Angular, React`,
+    );
   }
 
   const strategy = steps.length > 1 ? 'incremental' : 'direct';

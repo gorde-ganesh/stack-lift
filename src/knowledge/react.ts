@@ -1,4 +1,4 @@
-import type { BreakingChange, UpgradeStep } from '../types/index.js';
+import type { UpgradeStep } from '../types/index.js';
 
 const REACT_STEPS: Record<string, UpgradeStep> = {
   '16-17': {
@@ -10,7 +10,7 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
         api: 'React import for JSX',
         description: 'New JSX transform no longer requires "import React from react" in every file',
         before: "import React from 'react';\nconst el = <div />;",
-        after: "// No React import needed for JSX\nconst el = <div />;",
+        after: '// No React import needed for JSX\nconst el = <div />;',
         automated: true,
         severity: 'low',
         fromVersion: '16',
@@ -32,7 +32,8 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
       },
       {
         api: 'Event delegation target',
-        description: 'Events now delegate to the React root instead of document — affects manual addEventListener on document',
+        description:
+          'Events now delegate to the React root instead of document — affects manual addEventListener on document',
         automated: false,
         severity: 'medium',
         fromVersion: '16',
@@ -67,8 +68,10 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
       {
         api: 'ReactDOM.render',
         description: 'ReactDOM.render is deprecated. Replace with createRoot().render()',
-        before: "import ReactDOM from 'react-dom';\nReactDOM.render(<App />, document.getElementById('root'));",
-        after: "import { createRoot } from 'react-dom/client';\ncreateRoot(document.getElementById('root')!).render(<App />);",
+        before:
+          "import ReactDOM from 'react-dom';\nReactDOM.render(<App />, document.getElementById('root'));",
+        after:
+          "import { createRoot } from 'react-dom/client';\ncreateRoot(document.getElementById('root')!).render(<App />);",
         automated: true,
         severity: 'high',
         fromVersion: '17',
@@ -79,7 +82,7 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
       {
         api: 'ReactDOM.hydrate',
         description: 'ReactDOM.hydrate deprecated. Replace with hydrateRoot()',
-        before: "ReactDOM.hydrate(<App />, container);",
+        before: 'ReactDOM.hydrate(<App />, container);',
         after: "import { hydrateRoot } from 'react-dom/client';\nhydrateRoot(container, <App />);",
         automated: true,
         severity: 'high',
@@ -90,7 +93,8 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
       },
       {
         api: 'Automatic batching',
-        description: 'State updates inside async callbacks are now batched — may affect tests expecting immediate re-renders',
+        description:
+          'State updates inside async callbacks are now batched — may affect tests expecting immediate re-renders',
         automated: false,
         severity: 'medium',
         fromVersion: '17',
@@ -99,7 +103,8 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
       },
       {
         api: 'StrictMode double-invoke effects',
-        description: 'StrictMode now mounts/unmounts/mounts components to detect effect cleanup issues',
+        description:
+          'StrictMode now mounts/unmounts/mounts components to detect effect cleanup issues',
         automated: false,
         severity: 'medium',
         fromVersion: '17',
@@ -108,7 +113,8 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
       },
       {
         api: 'renderToString Suspense support',
-        description: 'renderToString now supports Suspense; previously unsupported Suspense boundaries threw',
+        description:
+          'renderToString now supports Suspense; previously unsupported Suspense boundaries threw',
         automated: false,
         severity: 'low',
         fromVersion: '17',
@@ -117,7 +123,8 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
       },
       {
         api: 'unmountComponentAtNode',
-        description: 'unmountComponentAtNode deprecated. Use root.unmount() on the createRoot instance',
+        description:
+          'unmountComponentAtNode deprecated. Use root.unmount() on the createRoot instance',
         before: 'ReactDOM.unmountComponentAtNode(container);',
         after: 'root.unmount(); // where root = createRoot(container)',
         automated: false,
@@ -143,13 +150,17 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
   '18-19': {
     fromVersion: '18',
     toVersion: '19',
-    description: 'React 19: Actions, use() hook, ref as prop, improved error handling, asset loading',
+    description:
+      'React 19: Actions, use() hook, ref as prop, improved error handling, asset loading',
     breakingChanges: [
       {
         api: 'forwardRef',
-        description: 'forwardRef is deprecated — ref is now a regular prop. Remove forwardRef wrapper.',
-        before: "const Comp = forwardRef<HTMLDivElement, Props>((props, ref) => <div ref={ref} {...props} />);",
-        after: "const Comp = ({ ref, ...props }: Props & { ref?: Ref<HTMLDivElement> }) => <div ref={ref} {...props} />;",
+        description:
+          'forwardRef is deprecated — ref is now a regular prop. Remove forwardRef wrapper.',
+        before:
+          'const Comp = forwardRef<HTMLDivElement, Props>((props, ref) => <div ref={ref} {...props} />);',
+        after:
+          'const Comp = ({ ref, ...props }: Props & { ref?: Ref<HTMLDivElement> }) => <div ref={ref} {...props} />;',
         automated: false,
         severity: 'medium',
         fromVersion: '18',
@@ -160,8 +171,10 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
       {
         api: 'propTypes and defaultProps on function components',
         description: 'propTypes and defaultProps on function components are removed',
-        before: 'MyComp.propTypes = { name: PropTypes.string };\nMyComp.defaultProps = { name: "world" };',
-        after: '// Use TypeScript types and default parameters instead\nfunction MyComp({ name = "world" }: { name?: string }) {}',
+        before:
+          'MyComp.propTypes = { name: PropTypes.string };\nMyComp.defaultProps = { name: "world" };',
+        after:
+          '// Use TypeScript types and default parameters instead\nfunction MyComp({ name = "world" }: { name?: string }) {}',
         automated: false,
         severity: 'high',
         fromVersion: '18',
@@ -173,7 +186,7 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
         api: 'string refs',
         description: 'String refs are removed — use useRef() or callback refs',
         before: "<input ref='myInput' />",
-        after: "const ref = useRef(null);\n<input ref={ref} />",
+        after: 'const ref = useRef(null);\n<input ref={ref} />',
         automated: false,
         severity: 'high',
         fromVersion: '18',
@@ -222,8 +235,8 @@ const REACT_STEPS: Record<string, UpgradeStep> = {
 
 export function getReactUpgradeSteps(from: string, to: string): UpgradeStep[] {
   const majorVersionOrder = ['16', '17', '18', '19'];
-  const fromMajor = from.split('.')[0];
-  const toMajor = to.split('.')[0];
+  const fromMajor = from.split('.')[0] ?? '';
+  const toMajor = to.split('.')[0] ?? '';
 
   const fromIdx = majorVersionOrder.indexOf(fromMajor);
   const toIdx = majorVersionOrder.indexOf(toMajor);

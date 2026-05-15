@@ -4,7 +4,8 @@ import type { StackInfo, Framework, BuildTool, PackageManager } from '../types/i
 
 function readJsonFile(filePath: string): Record<string, unknown> | null {
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(content) as Record<string, unknown>;
   } catch {
     return null;
   }
@@ -15,21 +16,34 @@ function exists(filePath: string): boolean {
 }
 
 function stripRange(version: string): string {
-  return version.replace(/^[\^~>=<*]+/, '').split(' ')[0].split('-')[0];
+  return ((version.replace(/^[\^~>=<*]+/, '').split(' ')[0] ?? '').split('-')[0] ?? '').trim();
 }
 
 function detectFramework(
   deps: Record<string, string>,
-  devDeps: Record<string, string>
+  devDeps: Record<string, string>,
 ): [Framework, string] {
+  // Priority order matters: check more specific frameworks first
   const all = { ...deps, ...devDeps };
 
   if (all['@angular/core']) return ['Angular', stripRange(all['@angular/core'])];
-  if (all['next']) return ['Next.js', stripRange(all['next'])];
-  if (all['nuxt']) return ['Nuxt', stripRange(all['nuxt'])];
-  if (all['react']) return ['React', stripRange(all['react'])];
-  if (all['vue']) return ['Vue', stripRange(all['vue'])];
-  if (all['svelte']) return ['Svelte', stripRange(all['svelte'])];
+
+  // Next.js must come before React since it also lists 'react' as a dep
+  const nextVer = deps['next'] ?? devDeps['next'];
+  if (nextVer) return ['Next.js', stripRange(nextVer)];
+
+  // Nuxt must come before Vue
+  const nuxtVer = deps['nuxt'] ?? devDeps['nuxt'];
+  if (nuxtVer) return ['Nuxt', stripRange(nuxtVer)];
+
+  const reactVer = deps['react'] ?? devDeps['react'];
+  if (reactVer) return ['React', stripRange(reactVer)];
+
+  const vueVer = deps['vue'] ?? devDeps['vue'];
+  if (vueVer) return ['Vue', stripRange(vueVer)];
+
+  const svelteVer = deps['svelte'] ?? devDeps['svelte'];
+  if (svelteVer) return ['Svelte', stripRange(svelteVer)];
 
   return ['Unknown', '0.0.0'];
 }
@@ -37,21 +51,35 @@ function detectFramework(
 function detectBuildTool(
   projectPath: string,
   deps: Record<string, string>,
-  devDeps: Record<string, string>
+  devDeps: Record<string, string>,
 ): BuildTool {
-  if (exists(path.join(projectPath, 'vite.config.ts')) || exists(path.join(projectPath, 'vite.config.js')))
+  // File-based detection takes precedence over package.json
+  if (
+    exists(path.join(projectPath, 'vite.config.ts')) ||
+    exists(path.join(projectPath, 'vite.config.js'))
+  )
     return 'Vite';
   if (exists(path.join(projectPath, 'angular.json'))) return 'Angular CLI';
-  if (exists(path.join(projectPath, 'webpack.config.js')) || exists(path.join(projectPath, 'webpack.config.ts')))
+  if (
+    exists(path.join(projectPath, 'webpack.config.js')) ||
+    exists(path.join(projectPath, 'webpack.config.ts'))
+  )
     return 'Webpack';
-  // Check all deps for well-known build tools
+  if (
+    exists(path.join(projectPath, 'rollup.config.js')) ||
+    exists(path.join(projectPath, 'rollup.config.ts'))
+  )
+    return 'Rollup';
+
+  // Fall back to package.json presence
   const all = { ...deps, ...devDeps };
   if (all['@angular/cli'] || all['@angular-devkit/build-angular']) return 'Angular CLI';
   if (all['react-scripts']) return 'Create React App';
-  if (all['vite']) return 'Vite';
-  if (all['webpack']) return 'Webpack';
-  if (all['parcel']) return 'Parcel';
+  if (all['vite'] || all['@vitejs/plugin-react'] || all['@vitejs/plugin-vue']) return 'Vite';
+  if (all['webpack'] || all['webpack-cli']) return 'Webpack';
+  if (all['parcel'] || all['parcel-bundler']) return 'Parcel';
   if (all['rollup']) return 'Rollup';
+
   return 'Unknown';
 }
 
@@ -65,11 +93,27 @@ function detectPackageManager(projectPath: string): PackageManager {
 function readNodeVersion(projectPath: string, pkg: Record<string, unknown>): string | undefined {
   for (const file of ['.nvmrc', '.node-version']) {
     const p = path.join(projectPath, file);
-    if (exists(p)) return fs.readFileSync(p, 'utf-8').trim().replace(/^v/, '');
+    if (exists(p)) {
+      return fs.readFileSync(p, 'utf-8').trim().replace(/^v/, '');
+    }
   }
   const engines = pkg['engines'] as Record<string, string> | undefined;
   if (engines?.['node']) return stripRange(engines['node']);
   return undefined;
+}
+
+function detectIsMonorepo(projectPath: string, pkg: Record<string, unknown>): boolean {
+  // Yarn/npm workspaces
+  if (pkg['workspaces']) return true;
+  // pnpm workspaces
+  if (exists(path.join(projectPath, 'pnpm-workspace.yaml'))) return true;
+  // Lerna
+  if (exists(path.join(projectPath, 'lerna.json'))) return true;
+  // Nx
+  if (exists(path.join(projectPath, 'nx.json'))) return true;
+  // Turborepo
+  if (exists(path.join(projectPath, 'turbo.json'))) return true;
+  return false;
 }
 
 export function detectStack(projectPath: string): StackInfo {
@@ -86,17 +130,22 @@ export function detectStack(projectPath: string): StackInfo {
   const all = { ...deps, ...devDeps };
 
   const [framework, frameworkVersion] = detectFramework(deps, devDeps);
+  const isMonorepo = detectIsMonorepo(resolved, pkg);
 
+  const nodeVersion = readNodeVersion(resolved, pkg);
+  const tsVer = all['typescript'];
+  const rxjsVer = all['rxjs'];
   return {
     framework,
     frameworkVersion,
-    typescript: all['typescript'] ? stripRange(all['typescript']) : undefined,
-    rxjs: all['rxjs'] ? stripRange(all['rxjs']) : undefined,
+    ...(tsVer ? { typescript: stripRange(tsVer) } : {}),
+    ...(rxjsVer ? { rxjs: stripRange(rxjsVer) } : {}),
     buildTool: detectBuildTool(resolved, deps, devDeps),
-    nodeVersion: readNodeVersion(resolved, pkg),
+    ...(nodeVersion !== undefined ? { nodeVersion } : {}),
     packageManager: detectPackageManager(resolved),
     projectPath: resolved,
     rawDependencies: deps,
     rawDevDependencies: devDeps,
+    isMonorepo,
   };
 }

@@ -45,7 +45,7 @@ function countFiles(dir: string): number {
   return count;
 }
 
-export async function installSkill(skillName: string, customDir?: string): Promise<void> {
+export function installSkill(skillName: string, customDir?: string): void {
   const spinner = ora(`Looking up skill: ${chalk.cyan(skillName)}`).start();
 
   const entry = SKILL_REGISTRY[skillName];
@@ -63,7 +63,7 @@ export async function installSkill(skillName: string, customDir?: string): Promi
 
   if (entry.source.type === 'bundled') {
     const pkgRoot = getPackageRoot();
-    const srcDir = path.join(pkgRoot, entry.source.bundledPath!);
+    const srcDir = path.join(pkgRoot, entry.source.bundledPath ?? '');
 
     if (!fs.existsSync(srcDir)) {
       spinner.fail(
