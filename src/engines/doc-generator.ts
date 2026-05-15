@@ -1,4 +1,10 @@
-import type { UpgradeReport, BreakingChange, DependencyInfo, PeerDepConflict } from '../types/index.js';
+import type {
+  UpgradeReport,
+  BreakingChange,
+  DependencyInfo,
+  PeerDepConflict,
+  BuildValidationResult,
+} from '../types/index.js';
 
 const RISK_EMOJI: Record<string, string> = {
   critical: '🔴',
@@ -17,18 +23,25 @@ function codeBlock(code: string, lang = ''): string {
   return `\`\`\`${lang}\n${code}\n\`\`\``;
 }
 
+const CONFIDENCE_LABEL: Record<string, string> = {
+  high: '✅ High',
+  medium: '⚠️ Medium',
+  low: '❓ Low',
+};
+
 function changeTable(changes: BreakingChange[]): string {
   if (changes.length === 0) return '_No breaking changes in this step._\n';
 
   const rows = changes.map((c) => {
     const automated = c.automated ? '✅ Auto' : '🔧 Manual';
-    return `| ${SEVERITY_EMOJI[c.severity]} | \`${c.api}\` | ${c.description} | ${automated} |`;
+    const conf = CONFIDENCE_LABEL[c.confidence ?? 'medium'] ?? CONFIDENCE_LABEL['medium'];
+    return `| ${SEVERITY_EMOJI[c.severity]} | \`${c.api}\` | ${c.description} | ${automated} | ${conf} |`;
   });
 
   return (
     [
-      '| Severity | API | Description | Fix |',
-      '|----------|-----|-------------|-----|',
+      '| Severity | API | Description | Fix | Confidence |',
+      '|----------|-----|-------------|-----|-----------|',
       ...rows,
     ].join('\n') + '\n'
   );
@@ -45,15 +58,16 @@ function depTable(deps: DependencyInfo[], lockfileParsed?: boolean): string {
     const label = d.deprecated ? '⚠️ Deprecated' : 'Outdated';
     const reason = d.reason ? ` — ${d.reason}` : '';
     const sourceTag = d.latestSource === 'registry' ? '' : ' _(fallback)_';
-    return `| ${RISK_EMOJI[d.risk]} | \`${d.name}\` | ${d.current} | ${d.latest}${sourceTag} | ${label}${reason} |`;
+    const conf = CONFIDENCE_LABEL[d.confidence ?? 'medium'] ?? '';
+    return `| ${RISK_EMOJI[d.risk]} | \`${d.name}\` | ${d.current} | ${d.latest}${sourceTag} | ${label}${reason} | ${conf} |`;
   });
 
   return (
     [
       sourceNote,
       '',
-      '| Risk | Package | Current | Latest | Note |',
-      '|------|---------|---------|--------|------|',
+      '| Risk | Package | Current | Latest | Note | Confidence |',
+      '|------|---------|---------|--------|------|-----------|',
       ...rows,
     ].join('\n') + '\n'
   );
@@ -252,6 +266,26 @@ export function generateMarkdownReport(report: UpgradeReport): string {
     );
   }
 
+  // Build validation
+  if (report.buildValidation && report.buildValidation.length > 0) {
+    const rows = report.buildValidation.map((r: BuildValidationResult) => {
+      const icon = r.status === 'success' ? '✅' : r.status === 'failed' ? '❌' : '⏭️';
+      const dur = r.durationMs !== undefined ? ` (${Math.round(r.durationMs / 1000)}s)` : '';
+      const err = r.error ? `\n  \`\`\`\n  ${r.error.slice(0, 300)}\n  \`\`\`` : '';
+      return `| ${icon} | ${r.step} | ${r.status}${dur} |${err}`;
+    });
+    sections.push(
+      [
+        '## Build Validation',
+        '',
+        '| Status | Step | Result |',
+        '|--------|------|--------|',
+        ...rows,
+        '',
+      ].join('\n'),
+    );
+  }
+
   // Rollback plan
   sections.push(
     [
@@ -272,4 +306,112 @@ export function generateMarkdownReport(report: UpgradeReport): string {
 
 export function generateJsonReport(report: UpgradeReport): string {
   return JSON.stringify(report, null, 2);
+}
+
+/**
+ * findings.json — structured, evidence-based list of every finding.
+ * Machine-readable; designed for CI consumption.
+ */
+export function generateFindingsJson(report: UpgradeReport): string {
+  const findings = [
+    ...report.outdatedDependencies.map((d) => ({
+      type: d.deprecated ? 'deprecated_package' : 'outdated_package',
+      package: d.name,
+      current: d.current,
+      latest: d.latest,
+      riskLevel: d.risk,
+      riskCategory: d.riskCategory ?? (d.deprecated ? 'deprecated' : 'breaking-compatibility'),
+      confidence: d.confidence,
+      source: d.observedIn ?? 'package.json',
+      evidence: d.latestSource === 'registry' ? 'npm registry query' : 'static knowledge base',
+      reason: d.reason ?? null,
+    })),
+    ...report.peerConflicts.map((c) => ({
+      type: 'peer_conflict',
+      package: c.package,
+      installedVersion: c.installedVersion,
+      requiredRange: c.requiredRange,
+      requiredBy: c.requiredBy,
+      unresolvable: c.unresolvable,
+      confidence: 'high',
+      source: 'package.json + lockfile',
+      evidence: 'semver peer constraint check',
+    })),
+    ...report.refactorResults.flatMap((r) =>
+      r.suggestions.map((s) => ({
+        type: 'code_issue',
+        file: r.file,
+        line: s.line ?? null,
+        api: s.change.api,
+        description: s.change.description,
+        automated: s.change.automated,
+        severity: s.change.severity,
+        confidence: s.change.confidence ?? 'medium',
+        source: r.file,
+        evidence: 'source pattern scan',
+      })),
+    ),
+  ];
+
+  return JSON.stringify(
+    {
+      schemaVersion: '1.0',
+      generatedAt: report.generatedAt,
+      project: {
+        framework: report.stack.framework,
+        version: report.stack.frameworkVersion,
+        packageManager: report.stack.packageManager,
+        lockfileParsed: report.stack.lockfileParsed,
+      },
+      summary: {
+        totalFindings: findings.length,
+        deprecated: report.outdatedDependencies.filter((d) => d.deprecated).length,
+        outdated: report.outdatedDependencies.filter((d) => !d.deprecated).length,
+        peerConflicts: report.peerConflicts.length,
+        codeIssues: report.refactorResults.flatMap((r) => r.suggestions).length,
+      },
+      findings,
+    },
+    null,
+    2,
+  );
+}
+
+/**
+ * plan.json — machine-readable upgrade plan, decisions, and validation results.
+ */
+export function generatePlanJson(report: UpgradeReport): string {
+  return JSON.stringify(
+    {
+      schemaVersion: '1.0',
+      generatedAt: report.generatedAt,
+      framework: report.stack.framework,
+      fromVersion: report.plan.fromVersion,
+      toVersion: report.plan.toVersion,
+      strategy: report.plan.strategy,
+      riskLevel: report.plan.riskLevel,
+      estimatedEffort: report.plan.estimatedEffort,
+      effortBasis: report.plan.effortBasis,
+      decisions: report.decisions ?? null,
+      steps: report.plan.steps.map((s) => ({
+        fromVersion: s.fromVersion,
+        toVersion: s.toVersion,
+        description: s.description,
+        referenceUrl: s.referenceUrl ?? null,
+        npmInstall: s.npmInstall,
+        manualActions: s.manualActions,
+        breakingChanges: s.breakingChanges.map((c) => ({
+          api: c.api,
+          description: c.description,
+          automated: c.automated,
+          severity: c.severity,
+          confidence: c.confidence,
+          category: c.category,
+        })),
+      })),
+      buildValidation: report.buildValidation ?? null,
+    },
+    null,
+    2,
+  );
 }

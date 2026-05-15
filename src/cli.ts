@@ -7,10 +7,12 @@ import { runUpgrade } from './engines/orchestrator.js';
 import { detectStack } from './engines/stack-detector.js';
 import { analyzeDependencies } from './engines/dependency-analyzer.js';
 import { planUpgrade } from './engines/upgrade-planner.js';
-import { writeArtifacts } from './engines/artifact-writer.js';
+import { writeArtifacts, writeMachineArtifacts } from './engines/artifact-writer.js';
 import { runInteractive } from './engines/interaction.js';
+import { readSession, clearSession } from './engines/session.js';
+import { validateBuild } from './engines/build-validator.js';
 import { installSkill, removeSkill, listSkills, searchSkills } from './skills/manager.js';
-import type { UpgradeReport, RiskLevel, ArtifactFormat } from './types/index.js';
+import type { UpgradeReport, RiskLevel, ArtifactFormat, MigrationObjective } from './types/index.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -66,7 +68,8 @@ function printPlanSummary(report: UpgradeReport) {
     );
     for (const bc of step.breakingChanges) {
       const icon = bc.automated ? chalk.green('✔') : chalk.yellow('⚠');
-      console.log(`    ${icon} ${chalk.bold(bc.api)}: ${bc.description}`);
+      const conf = bc.confidence ? chalk.dim(` [${bc.confidence} confidence]`) : '';
+      console.log(`    ${icon} ${chalk.bold(bc.api)}: ${bc.description}${conf}`);
     }
     if (step.breakingChanges.length === 0) {
       console.log(`    ${chalk.green('✔')} No breaking changes`);
@@ -87,8 +90,9 @@ function printDependencySummary(report: UpgradeReport) {
     const riskFn = RISK_COLOR[d.risk];
     const tag = d.deprecated ? chalk.red('[DEPRECATED]') : chalk.dim('[outdated]');
     const latest = d.latest === 'unknown' ? chalk.dim('unknown') : chalk.cyan(d.latest);
+    const conf = chalk.dim(`[${d.confidence} confidence]`);
     console.log(
-      `  ${riskFn('●')} ${chalk.bold(d.name.padEnd(45))} ${chalk.dim(d.current)} → ${latest} ${tag}`,
+      `  ${riskFn('●')} ${chalk.bold(d.name.padEnd(45))} ${chalk.dim(d.current)} → ${latest} ${tag} ${conf}`,
     );
     if (d.reason) console.log(`      ${chalk.dim(d.reason)}`);
   }
@@ -108,7 +112,8 @@ function printCodeSuggestions(report: UpgradeReport) {
     for (const s of r.suggestions) {
       const icon = s.change.automated ? chalk.green('✔ auto') : chalk.yellow('⚠ manual');
       const loc = s.line ? chalk.dim(`:${s.line}`) : '';
-      console.log(`    ${icon}  Line${loc} — ${chalk.bold(s.change.api)}`);
+      const conf = s.change.confidence ? chalk.dim(` [${s.change.confidence}]`) : '';
+      console.log(`    ${icon}  Line${loc} — ${chalk.bold(s.change.api)}${conf}`);
       if (s.matchedText) console.log(`         ${chalk.dim(s.matchedText)}`);
     }
     if (r.applied && r.applied.length > 0) {
@@ -140,6 +145,100 @@ function printTerminalReport(report: UpgradeReport) {
   printManualActions(report);
 }
 
+// ── Audit helpers ────────────────────────────────────────────────────────────
+
+async function runAudit(projectPath: string, options: { json?: boolean; markdown?: boolean; outDir?: string }) {
+  const spinner = ora('Auditing project (read-only)…').start();
+  try {
+    const resolved = path.resolve(projectPath);
+    const stack = detectStack(resolved);
+    spinner.text = 'Querying npm registry…';
+    const { outdated, peerConflicts } = await analyzeDependencies(stack);
+    spinner.succeed(`Audit complete: ${outdated.length} findings, ${peerConflicts.length} peer conflicts`);
+
+    // Print findings grouped by risk category
+    console.log('');
+    console.log(chalk.bold.blue('  ╔══════════════════════════════════════════╗'));
+    console.log(chalk.bold.blue('  ║              stack-lift audit              ║'));
+    console.log(chalk.bold.blue('  ╚══════════════════════════════════════════╝'));
+    console.log('');
+    console.log(chalk.bold(`  ${stack.framework} ${stack.frameworkVersion}`) + chalk.dim(` — ${stack.packageManager} — lockfile: ${stack.lockfileParsed ? 'parsed' : 'not found'}`));
+    console.log('');
+
+    const deprecated = outdated.filter(d => d.deprecated);
+    const outdatedOnly = outdated.filter(d => !d.deprecated);
+
+    if (deprecated.length > 0) {
+      console.log(chalk.bold.red(`  ⚠ Deprecated / Abandoned (${deprecated.length})`));
+      for (const d of deprecated) {
+        const conf = chalk.dim(`confidence: ${d.confidence}`);
+        const src = chalk.dim(`source: ${d.observedIn ?? 'package.json'}, evidence: npm registry`);
+        console.log(`  ${chalk.red('●')} ${chalk.bold(d.name)} ${chalk.dim(d.current)}`);
+        console.log(`    ${d.reason ?? 'deprecated'}`);
+        console.log(`    ${conf} | ${src}`);
+        console.log('');
+      }
+    }
+
+    if (peerConflicts.length > 0) {
+      console.log(chalk.bold.yellow(`  ⚡ Peer Dependency Conflicts (${peerConflicts.length})`));
+      for (const c of peerConflicts) {
+        const status = c.unresolvable ? chalk.red('UNRESOLVABLE') : chalk.yellow('CONFLICT');
+        console.log(`  ${chalk.yellow('●')} ${chalk.bold(c.package)} ${chalk.dim(c.installedVersion)}`);
+        console.log(`    Required: ${chalk.cyan(c.requiredRange)} by ${chalk.bold(c.requiredBy)} [${status}]`);
+        console.log(`    ${chalk.dim('confidence: high | source: lockfile, evidence: semver constraint check')}`);
+        console.log('');
+      }
+    }
+
+    if (outdatedOnly.length > 0) {
+      console.log(chalk.bold(`  ↑ Outdated Packages (${outdatedOnly.length})`));
+      for (const d of outdatedOnly.slice(0, 15)) {
+        const riskFn = RISK_COLOR[d.risk];
+        const latest = d.latest === 'unknown' ? chalk.dim('unknown') : chalk.cyan(d.latest);
+        console.log(`  ${riskFn('●')} ${chalk.bold(d.name.padEnd(42))} ${chalk.dim(d.current)} → ${latest} ${chalk.dim(`[${d.risk}]`)}`);
+      }
+      if (outdatedOnly.length > 15) console.log(`  ${chalk.dim(`… and ${outdatedOnly.length - 15} more`)}`);
+      console.log('');
+    }
+
+    if (deprecated.length === 0 && peerConflicts.length === 0 && outdatedOnly.length === 0) {
+      console.log(chalk.green('  ✔ No issues found. Project looks clean.\n'));
+    }
+
+    console.log(chalk.dim(`  Run ${chalk.white('stack-lift migrate <path>')} for interactive guided migration.`));
+    console.log('');
+
+    // Write artifacts if requested
+    if (options.json || options.markdown) {
+      const plan = planUpgrade(stack, undefined);
+      const report: UpgradeReport = {
+        stack,
+        plan,
+        outdatedDependencies: outdated,
+        peerConflicts,
+        refactorResults: [],
+        manualActions: [],
+        buildStatus: 'skipped',
+        generatedAt: new Date().toISOString(),
+      };
+      const formats: ArtifactFormat[] = [];
+      if (options.json) formats.push('json');
+      if (options.markdown) formats.push('markdown');
+      const outDir = path.resolve(resolved, options.outDir ?? './stacklift-output');
+      const artifacts = writeArtifacts(report, outDir, formats);
+      const machineArtifacts = writeMachineArtifacts(report, outDir);
+      for (const a of [...artifacts, ...machineArtifacts]) {
+        console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
+      }
+      console.log('');
+    }
+  } catch (err) {
+    spinner.fail(String(err));
+    process.exitCode = 1;
+  }
+}
+
 // ── Commands ─────────────────────────────────────────────────────────────────
 
 const program = new Command();
@@ -149,9 +248,23 @@ program
   .description('AI-powered upgrade assistant for Angular, React, and legacy frontend codebases')
   .version(pkg.version);
 
+// ── audit ────────────────────────────────────────────────────────────────────
+
+program
+  .command('audit <path>')
+  .description('Read-only findings: deprecated packages, peer conflicts, outdated deps — with evidence and confidence scores')
+  .option('--json', 'Write findings.json to output dir')
+  .option('--markdown', 'Write markdown report to output dir')
+  .option('--out-dir <dir>', 'Directory for artifact files', './stacklift-output')
+  .action(async (projectPath: string, options: { json?: boolean; markdown?: boolean; outDir?: string }) => {
+    await runAudit(projectPath, options);
+  });
+
+// ── analyze (kept for backwards-compat) ─────────────────────────────────────
+
 program
   .command('analyze <path>')
-  .description('Analyze a project and show what needs upgrading')
+  .description('Alias for audit — analyze a project and show what needs upgrading')
   .action(async (projectPath: string) => {
     const spinner = ora('Analyzing project…').start();
     try {
@@ -197,6 +310,8 @@ program
     }
   });
 
+// ── upgrade (kept for backwards-compat) ─────────────────────────────────────
+
 program
   .command('upgrade <path>')
   .description('Generate a full upgrade plan with breaking changes and code suggestions')
@@ -221,7 +336,6 @@ program
         const fileFormats = requestedFormats.filter(f => f === 'markdown' || f === 'json') as ArtifactFormat[];
         const toTerminal = requestedFormats.includes('terminal');
 
-        // Use markdown/json for the orchestrator's single-format path if only one file format
         const primaryFileFormat = fileFormats[0];
         const orchFormat = primaryFileFormat ?? 'terminal';
 
@@ -238,11 +352,11 @@ program
           printTerminalReport(result.report);
         }
 
-        // Write all requested file formats
         if (fileFormats.length > 0) {
           const outDir = path.resolve(resolved, options.outDir);
           const artifacts = writeArtifacts(result.report, outDir, fileFormats);
-          for (const a of artifacts) {
+          const machineArtifacts = writeMachineArtifacts(result.report, outDir);
+          for (const a of [...artifacts, ...machineArtifacts]) {
             console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} report written to: ${a.filePath}`));
           }
           console.log('');
@@ -266,11 +380,18 @@ program
     },
   );
 
+// ── plan ─────────────────────────────────────────────────────────────────────
+
 program
   .command('plan <path>')
-  .description('Show the upgrade path and step count without full analysis')
+  .description('Generate a deterministic upgrade plan — works in CI with --non-interactive')
   .option('-t, --to <version>', 'Target major version')
-  .action((projectPath: string, options: { to?: string }) => {
+  .option('--objective <objective>', 'Migration objective (minimal-risk|security|modernization|performance|full-migration)', 'minimal-risk')
+  .option('--non-interactive', 'Skip prompts and generate plan with provided options', false)
+  .option('--markdown', 'Write markdown report to output dir', false)
+  .option('--json', 'Write JSON artifacts to output dir', false)
+  .option('--out-dir <dir>', 'Directory for artifact files', './stacklift-output')
+  .action(async (projectPath: string, options: { to?: string; objective: string; nonInteractive: boolean; markdown: boolean; json: boolean; outDir: string }) => {
     try {
       const stack = detectStack(path.resolve(projectPath));
       const plan = planUpgrade(stack, options.to);
@@ -283,6 +404,7 @@ program
       console.log(
         `  Strategy: ${plan.strategy}  |  Risk: ${riskFn(plan.riskLevel)}  |  Effort: ${plan.estimatedEffort}`,
       );
+      console.log(`  ${chalk.dim('Effort basis:')} ${chalk.dim(plan.effortBasis)}`);
       console.log('');
 
       for (const [i, step] of plan.steps.entries()) {
@@ -292,30 +414,212 @@ program
         console.log(
           `     ${step.breakingChanges.length} breaking changes, ${step.automatedFixes} auto-fixable`,
         );
+        if (step.referenceUrl) {
+          console.log(`     ${chalk.dim(step.referenceUrl)}`);
+        }
       }
       console.log('');
+
+      if (options.json || options.markdown) {
+        const { outdated, peerConflicts } = await analyzeDependencies(stack);
+        const report: UpgradeReport = {
+          stack,
+          plan,
+          outdatedDependencies: outdated,
+          peerConflicts,
+          refactorResults: [],
+          manualActions: [...new Set(plan.steps.flatMap(s => s.manualActions))],
+          buildStatus: 'skipped',
+          generatedAt: new Date().toISOString(),
+        };
+        const formats: ArtifactFormat[] = [];
+        if (options.markdown) formats.push('markdown');
+        if (options.json) formats.push('json');
+        const outDir = path.resolve(path.resolve(projectPath), options.outDir);
+        const artifacts = writeArtifacts(report, outDir, formats);
+        const machineArtifacts = writeMachineArtifacts(report, outDir);
+        for (const a of [...artifacts, ...machineArtifacts]) {
+          console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
+        }
+        console.log('');
+      }
     } catch (err) {
       console.error(chalk.red(String(err)));
       process.exitCode = 1;
     }
   });
 
+// ── migrate ──────────────────────────────────────────────────────────────────
+
 program
   .command('migrate <path>')
   .description('Interactive guided migration — asks your intent, shows choices, writes artifacts')
-  .action(async (projectPath: string) => {
+  .option('-n, --non-interactive', 'Skip all prompts and use provided flags (suitable for CI)', false)
+  .option('-t, --target <version>', 'Target major version for non-interactive mode')
+  .option('-o, --objective <objective>', 'Migration objective (minimal-risk|security|modernization|performance|full-migration)')
+  .option('-y, --yes', 'Auto-approve all prompts', false)
+  .option('--dry-run', 'Show what would be done without writing files or creating backups', false)
+  .option('--apply', 'Apply automated AST code fixes', false)
+  .option('--validate', 'Run npm install + build + test + lint after planning', false)
+  .option('--json', 'Include JSON in output artifacts', false)
+  .option('--markdown', 'Include Markdown in output artifacts (default: on)', false)
+  .option('--out-dir <dir>', 'Output directory for artifacts', './stacklift-output')
+  .action(async (projectPath: string, options: {
+    nonInteractive: boolean;
+    target?: string;
+    objective?: string;
+    yes: boolean;
+    dryRun: boolean;
+    apply: boolean;
+    validate: boolean;
+    json: boolean;
+    markdown: boolean;
+    outDir: string;
+  }) => {
     try {
-      await runInteractive(projectPath);
+      const formats: ArtifactFormat[] = [];
+      if (options.markdown || (!options.json && !options.markdown)) formats.push('markdown');
+      if (options.json) formats.push('json');
+
+      await runInteractive(projectPath, {
+        nonInteractive: options.nonInteractive || options.yes,
+        apply: options.apply,
+        validate: options.validate,
+        options: {
+          ...(options.target !== undefined ? { target: options.target } : {}),
+          ...(options.objective !== undefined ? { objective: options.objective as MigrationObjective } : {}),
+          yes: options.yes,
+          dryRun: options.dryRun,
+          outputFormats: formats,
+          outputDir: options.outDir,
+          validate: options.validate,
+        },
+      });
     } catch (err) {
       const msg = String(err);
       if (msg.includes('User force closed')) {
-        // Ctrl+C — exit cleanly
         console.log(chalk.dim('\n  Aborted.\n'));
       } else {
         console.error(chalk.red(msg));
         process.exitCode = 1;
       }
     }
+  });
+
+// ── apply ─────────────────────────────────────────────────────────────────────
+
+program
+  .command('apply <path>')
+  .description('Execute the approved plan: apply automated fixes and run build validation')
+  .option('-t, --to <version>', 'Target major version')
+  .option('--validate', 'Run build validation after applying fixes', true)
+  .option('--out-dir <dir>', 'Output directory for artifacts', './stacklift-output')
+  .action(async (projectPath: string, options: { to?: string; validate: boolean; outDir: string }) => {
+    const spinner = ora('Running upgrade analysis with auto-fix…').start();
+    try {
+      const resolved = path.resolve(projectPath);
+      const result = await runUpgrade({
+        projectPath: resolved,
+        ...(options.to !== undefined ? { targetVersion: options.to } : {}),
+        apply: true,
+        outputFormat: 'terminal',
+      });
+      spinner.succeed('Analysis and automated fixes complete');
+
+      printTerminalReport(result.report);
+
+      if (options.validate) {
+        const stack = result.report.stack;
+        const valSpinner = ora('Running build validation…').start();
+        const buildResults = validateBuild({
+          projectPath: resolved,
+          packageManager: stack.packageManager,
+          steps: ['install', 'build', 'test', 'lint'],
+        });
+        result.report.buildValidation = buildResults;
+
+        const failed = buildResults.filter(r => r.status === 'failed');
+        if (failed.length > 0) {
+          valSpinner.warn(`Build validation: ${failed.length} step(s) failed`);
+          for (const r of failed) {
+            console.log(chalk.red(`  ✗ ${r.step}: ${(r.error ?? '').split('\n')[0]}`));
+          }
+        } else {
+          valSpinner.succeed('Build validation passed');
+        }
+        console.log('');
+      }
+
+      // Write all artifacts
+      const outDir = path.resolve(resolved, options.outDir);
+      const artifacts = writeArtifacts(result.report, outDir, ['markdown', 'json']);
+      const machineArtifacts = writeMachineArtifacts(result.report, outDir);
+      for (const a of [...artifacts, ...machineArtifacts]) {
+        console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
+      }
+      console.log('');
+    } catch (err) {
+      spinner.fail(String(err));
+      process.exitCode = 1;
+    }
+  });
+
+// ── resume ───────────────────────────────────────────────────────────────────
+
+program
+  .command('resume [path]')
+  .description('Resume an interrupted migrate session from .stacklift/session.json')
+  .action(async (projectPath?: string) => {
+    const resolved = path.resolve(projectPath ?? '.');
+    const session = readSession(resolved);
+    if (!session) {
+      console.log(chalk.yellow(`  No saved session found at ${resolved}/.stacklift/session.json`));
+      console.log(chalk.dim(`  Run ${chalk.white('stack-lift migrate <path>')} to start a new session.`));
+      console.log('');
+      return;
+    }
+
+    console.log('');
+    console.log(chalk.bold.blue('  ╔══════════════════════════════════════════╗'));
+    console.log(chalk.bold.blue('  ║           stack-lift resume               ║'));
+    console.log(chalk.bold.blue('  ╚══════════════════════════════════════════╝'));
+    console.log('');
+    console.log(chalk.bold('  Saved session found:'));
+    console.log(`  ${chalk.dim('Phase')}         ${session.phase}`);
+    console.log(`  ${chalk.dim('Last updated')} ${session.lastUpdatedAt}`);
+    console.log(`  ${chalk.dim('Created')}      ${session.createdAt}`);
+    if (session.decisions.objective) console.log(`  ${chalk.dim('Objective')}    ${session.decisions.objective}`);
+    if (session.decisions.targetVersion) console.log(`  ${chalk.dim('Target')}       ${session.decisions.targetVersion}`);
+    console.log('');
+
+    if (session.phase === 'done') {
+      console.log(chalk.green('  ✔ This session is already complete.'));
+      console.log(chalk.dim('  Check your output directory for the generated artifacts.'));
+      console.log('');
+
+      const { confirm } = await import('@inquirer/prompts');
+      const restart = await confirm({ message: 'Start a fresh session?', default: false });
+      if (restart) {
+        clearSession(resolved);
+        await runInteractive(resolved);
+      }
+      return;
+    }
+
+    console.log(chalk.dim(`  Resuming from phase: ${session.phase}…`));
+    console.log('');
+
+    // Pass saved decisions as non-interactive pre-fills and continue
+    const d = session.decisions;
+    await runInteractive(resolved, {
+      nonInteractive: false,
+      options: {
+        ...(d.targetVersion !== undefined ? { target: d.targetVersion } : {}),
+        ...(d.objective !== undefined ? { objective: d.objective } : {}),
+        ...(d.outputFormats !== undefined ? { outputFormats: d.outputFormats } : {}),
+        ...(d.outputDir !== undefined ? { outputDir: d.outputDir } : {}),
+      },
+    });
   });
 
 // ── skills sub-commands ──────────────────────────────────────────────────────
@@ -355,7 +659,6 @@ skillsCmd
     searchSkills(query);
   });
 
-// Parse and propagate async errors as non-zero exit codes
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(chalk.red(String(err)));
   process.exitCode = 1;

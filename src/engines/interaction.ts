@@ -8,11 +8,12 @@ import { analyzeDependencies } from './dependency-analyzer.js';
 import { planUpgrade } from './upgrade-planner.js';
 import { analyzeBreakingChanges } from './breaking-change-analyzer.js';
 import { applyRefactors } from './refactor-engine.js';
-import { writeArtifacts } from './artifact-writer.js';
+import { writeArtifacts, writeMachineArtifacts } from './artifact-writer.js';
 import { readSession, updateSession, clearSession } from './session.js';
 import { getReplacementEntry } from '../knowledge/replacements.js';
 import { ANGULAR_SUPPORTED_VERSIONS, getAngularLatestVersion } from '../knowledge/angular.js';
 import { REACT_SUPPORTED_VERSIONS, getReactLatestVersion } from '../knowledge/react.js';
+import { validateBuild } from './build-validator.js';
 import type {
   StackInfo,
   MigrationObjective,
@@ -21,6 +22,7 @@ import type {
   ArtifactFormat,
   PackageReplacement,
   UpgradeReport,
+  NonInteractiveOptions,
 } from '../types/index.js';
 import { execSync } from 'node:child_process';
 
@@ -42,8 +44,8 @@ function countOccurrences(projectPath: string, packageName: string): number {
   let count = 0;
 
   function walk(dir: string) {
-    let entries: ReturnType<typeof fs.readdirSync>;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    let entries: fs.Dirent<string>[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true, encoding: 'utf8' }); } catch { return; }
     for (const e of entries) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
@@ -153,6 +155,8 @@ async function runAnalysis(stack: StackInfo) {
 async function askPackageReplacements(
   stack: StackInfo,
   deprecatedNames: string[],
+  nonInteractive: boolean,
+  autoChoices?: Record<string, string>,
 ): Promise<PackageReplacement[]> {
   const replacements: PackageReplacement[] = [];
 
@@ -169,6 +173,15 @@ async function askPackageReplacements(
     console.log(`  ${chalk.bold.red('⚠')} ${chalk.bold(pkg)} — ${entry.reason}`);
     console.log(`  ${effortStr}`);
     console.log('');
+
+    if (nonInteractive) {
+      // In non-interactive mode: use pre-supplied choice, or pick first alternative, or skip
+      const preChosen = autoChoices?.[pkg];
+      const chosen = preChosen ?? entry.alternatives[0]?.name ?? null;
+      console.log(`  ${chalk.dim('→')} ${chalk.dim('non-interactive:')} ${chosen ? chalk.cyan(chosen) : chalk.dim('skipped')}`);
+      replacements.push({ package: pkg, chosen: chosen ?? null, occurrences });
+      continue;
+    }
 
     const choices = [
       ...entry.alternatives.map(alt => ({
@@ -201,7 +214,8 @@ async function askPackageReplacements(
   return replacements;
 }
 
-async function askBackupStrategy(): Promise<BackupStrategy> {
+async function askBackupStrategy(nonInteractive: boolean, yes: boolean): Promise<BackupStrategy> {
+  if (nonInteractive || yes) return 'none';
   return select<BackupStrategy>({
     message: 'Create a backup before starting?',
     choices: [
@@ -212,7 +226,8 @@ async function askBackupStrategy(): Promise<BackupStrategy> {
   });
 }
 
-async function askOutputFormats(): Promise<ArtifactFormat[]> {
+async function askOutputFormats(nonInteractive: boolean, preselected?: ArtifactFormat[]): Promise<ArtifactFormat[]> {
+  if (nonInteractive) return preselected ?? ['markdown', 'json'];
   return checkbox<ArtifactFormat>({
     message: 'Generate artifacts',
     choices: [
@@ -222,10 +237,11 @@ async function askOutputFormats(): Promise<ArtifactFormat[]> {
   });
 }
 
-async function askOutputDir(): Promise<string> {
+async function askOutputDir(nonInteractive: boolean, defaultDir?: string): Promise<string> {
+  if (nonInteractive) return defaultDir ?? './stacklift-output';
   return input({
     message: 'Output directory',
-    default: './stacklift-output',
+    default: defaultDir ?? './stacklift-output',
   });
 }
 
@@ -293,6 +309,20 @@ function printChecklist(report: UpgradeReport, replacements: PackageReplacement[
     console.log(`  ${chalk.yellow(String(allSuggestions.length))} location(s) require attention — see the report for details.\n`);
   }
 
+  // Build validation summary
+  if (report.buildValidation && report.buildValidation.length > 0) {
+    console.log(chalk.bold('  Build validation:'));
+    for (const r of report.buildValidation) {
+      const icon = r.status === 'success' ? chalk.green('✔') : r.status === 'failed' ? chalk.red('✗') : chalk.dim('○');
+      const dur = r.durationMs !== undefined ? chalk.dim(` (${Math.round(r.durationMs / 1000)}s)`) : '';
+      console.log(`  ${icon} ${r.step}${dur}`);
+      if (r.status === 'failed' && r.error) {
+        console.log(`    ${chalk.red(r.error.split('\n')[0] ?? r.error)}`);
+      }
+    }
+    console.log('');
+  }
+
   console.log(chalk.bold('  After each hop, run:'));
   console.log(`  ${chalk.dim('$')} ${report.stack.packageManager === 'yarn' ? 'yarn build && yarn test' : report.stack.packageManager === 'pnpm' ? 'pnpm build && pnpm test' : 'npm run build && npm test'}`);
   console.log('');
@@ -306,22 +336,42 @@ export interface InteractiveRunResult {
   artifacts: Array<{ format: string; filePath: string }>;
 }
 
-export async function runInteractive(projectPath: string): Promise<InteractiveRunResult> {
+export interface InteractiveOptions {
+  /** When true, skip prompts and use provided options. */
+  nonInteractive?: boolean;
+  /** Pre-supplied options for non-interactive mode. */
+  options?: NonInteractiveOptions;
+  /** When true, apply automated code fixes. */
+  apply?: boolean;
+  /** When true, run build validation after planning. */
+  validate?: boolean;
+}
+
+export async function runInteractive(
+  projectPath: string,
+  interactiveOpts: InteractiveOptions = {},
+): Promise<InteractiveRunResult> {
   const resolved = path.resolve(projectPath);
+  const ni = interactiveOpts.nonInteractive ?? false;
+  const niOpts = interactiveOpts.options ?? {};
+  const autoYes = ni || (niOpts.yes ?? false);
 
   console.log('');
   console.log(chalk.bold.blue('  ╔══════════════════════════════════════════╗'));
   console.log(chalk.bold.blue('  ║        stack-lift interactive migrate      ║'));
+  if (ni) console.log(chalk.bold.blue('  ║              [non-interactive mode]       ║'));
   console.log(chalk.bold.blue('  ╚══════════════════════════════════════════╝'));
 
   // ── Check for existing session ─────────────────────────────────────────────
-  const existing = readSession(resolved);
-  if (existing && existing.phase !== 'done') {
-    const resume = await confirm({
-      message: `Resume previous session from ${chalk.cyan(existing.lastUpdatedAt)}?`,
-      default: true,
-    });
-    if (!resume) clearSession(resolved);
+  if (!ni) {
+    const existing = readSession(resolved);
+    if (existing && existing.phase !== 'done') {
+      const resume = await confirm({
+        message: `Resume previous session from ${chalk.cyan(existing.lastUpdatedAt)}?`,
+        default: true,
+      });
+      if (!resume) clearSession(resolved);
+    }
   }
 
   // ── Phase 1: Discovery ─────────────────────────────────────────────────────
@@ -337,16 +387,31 @@ export async function runInteractive(projectPath: string): Promise<InteractiveRu
 
   printDiscovery(stack);
 
-  const shouldContinue = await confirm({ message: 'Continue with this project?', default: true });
-  if (!shouldContinue) {
-    console.log(chalk.dim('  Aborted.\n'));
-    process.exit(0);
+  if (!ni) {
+    const shouldContinue = await confirm({ message: 'Continue with this project?', default: true });
+    if (!shouldContinue) {
+      console.log(chalk.dim('  Aborted.\n'));
+      process.exit(0);
+    }
   }
 
   // ── Phase 2: Intent ────────────────────────────────────────────────────────
   phaseHeader('Phase 2 — Intent');
-  const objective = await askObjective();
-  const targetVersion = await askTargetVersion(stack, objective);
+  const objective = ni
+    ? (niOpts.objective ?? 'minimal-risk')
+    : await askObjective();
+
+  if (ni) {
+    console.log(`  ${chalk.dim('Objective')}  ${chalk.cyan(objective)}`);
+  }
+
+  const targetVersion = ni && niOpts.target
+    ? niOpts.target
+    : await askTargetVersion(stack, objective);
+
+  if (ni) {
+    console.log(`  ${chalk.dim('Target   ')}  ${chalk.cyan(`${stack.framework} ${targetVersion}`)}`);
+  }
 
   updateSession(resolved, { phase: 'decisions', decisions: { objective, targetVersion } });
 
@@ -360,6 +425,9 @@ export async function runInteractive(projectPath: string): Promise<InteractiveRu
     console.log(chalk.bold(`  ${chalk.red('!')} Peer dependency conflicts (${peerConflicts.length}):`));
     for (const c of peerConflicts) {
       console.log(`  ${chalk.red('●')} ${chalk.bold(c.package)} ${chalk.dim(c.installedVersion)} does not satisfy ${chalk.cyan(c.requiredRange)} required by ${chalk.bold(c.requiredBy)}`);
+      if (c.unresolvable) {
+        console.log(`     ${chalk.red('Unresolvable')} — no published version satisfies both constraints`);
+      }
     }
   }
 
@@ -368,7 +436,7 @@ export async function runInteractive(projectPath: string): Promise<InteractiveRu
     console.log('');
     console.log(chalk.bold(`  Deprecated packages found (${deprecated.length}):`));
     for (const d of deprecated) {
-      console.log(`  ${chalk.red('●')} ${chalk.bold(d.name)} ${chalk.dim(d.current)} — ${d.reason ?? 'deprecated'}`);
+      console.log(`  ${chalk.red('●')} ${chalk.bold(d.name)} ${chalk.dim(d.current)} — ${d.reason ?? 'deprecated'} ${chalk.dim(`[confidence: ${d.confidence}]`)}`);
     }
   }
 
@@ -383,11 +451,13 @@ export async function runInteractive(projectPath: string): Promise<InteractiveRu
     if (outdatedOnly.length > 8) console.log(`  ${chalk.dim(`… and ${outdatedOnly.length - 8} more`)}`);
   }
 
-  console.log('');
-  const phase3ok = await confirm({ message: 'Analysis complete. Continue to decisions?', default: true });
-  if (!phase3ok) {
-    console.log(chalk.dim('  Paused. Re-run to resume.\n'));
-    process.exit(0);
+  if (!ni) {
+    console.log('');
+    const phase3ok = await confirm({ message: 'Analysis complete. Continue to decisions?', default: true });
+    if (!phase3ok) {
+      console.log(chalk.dim('  Paused. Re-run to resume.\n'));
+      process.exit(0);
+    }
   }
 
   // ── Phase 4: Decisions ─────────────────────────────────────────────────────
@@ -396,14 +466,18 @@ export async function runInteractive(projectPath: string): Promise<InteractiveRu
   const deprecatedWithReplacements = deprecated.filter(d => getReplacementEntry(d.name));
   let packageReplacements: PackageReplacement[] = [];
   if (deprecatedWithReplacements.length > 0) {
-    console.log('  For each deprecated package, choose a replacement or defer:\n');
-    packageReplacements = await askPackageReplacements(stack, deprecatedWithReplacements.map(d => d.name));
+    if (!ni) console.log('  For each deprecated package, choose a replacement or defer:\n');
+    packageReplacements = await askPackageReplacements(
+      stack,
+      deprecatedWithReplacements.map(d => d.name),
+      ni,
+    );
   }
 
   console.log('');
-  const backupStrategy = await askBackupStrategy();
-  const outputFormats = await askOutputFormats();
-  const outputDir = await askOutputDir();
+  const backupStrategy = await askBackupStrategy(ni, autoYes);
+  const outputFormats = await askOutputFormats(ni, niOpts.outputFormats);
+  const outputDir = await askOutputDir(ni, niOpts.outputDir);
 
   updateSession(resolved, {
     phase: 'planning',
@@ -417,27 +491,29 @@ export async function runInteractive(projectPath: string): Promise<InteractiveRu
     backupStrategy,
     outputFormats,
     outputDir,
-    autoApply: false,
+    autoApply: interactiveOpts.apply ?? false,
   };
 
   // ── Confirmation ───────────────────────────────────────────────────────────
-  console.log('');
-  divider();
-  console.log(`  ${chalk.bold('Objective')}  ${objective}`);
-  console.log(`  ${chalk.bold('Target')}     ${stack.framework} ${targetVersion}`);
-  console.log(`  ${chalk.bold('Backup')}     ${backupStrategy}`);
-  console.log(`  ${chalk.bold('Output')}     ${outputFormats.join(', ')} → ${outputDir}`);
-  const chosen = packageReplacements.filter(r => r.chosen !== null);
-  const skipped = packageReplacements.filter(r => r.chosen === null);
-  if (chosen.length > 0) console.log(`  ${chalk.bold('Replace')}    ${chosen.map(r => `${r.package} → ${r.chosen}`).join(', ')}`);
-  if (skipped.length > 0) console.log(`  ${chalk.bold('Defer')}      ${skipped.map(r => r.package).join(', ')}`);
-  divider();
-  console.log('');
+  if (!ni) {
+    console.log('');
+    divider();
+    console.log(`  ${chalk.bold('Objective')}  ${objective}`);
+    console.log(`  ${chalk.bold('Target')}     ${stack.framework} ${targetVersion}`);
+    console.log(`  ${chalk.bold('Backup')}     ${backupStrategy}`);
+    console.log(`  ${chalk.bold('Output')}     ${outputFormats.join(', ')} → ${outputDir}`);
+    const chosen = packageReplacements.filter(r => r.chosen !== null);
+    const skipped = packageReplacements.filter(r => r.chosen === null);
+    if (chosen.length > 0) console.log(`  ${chalk.bold('Replace')}    ${chosen.map(r => `${r.package} → ${r.chosen}`).join(', ')}`);
+    if (skipped.length > 0) console.log(`  ${chalk.bold('Defer')}      ${skipped.map(r => r.package).join(', ')}`);
+    divider();
+    console.log('');
 
-  const goAhead = await confirm({ message: 'Generate plan and write artifacts?', default: true });
-  if (!goAhead) {
-    console.log(chalk.dim('  Cancelled. Session saved — re-run to resume.\n'));
-    process.exit(0);
+    const goAhead = await confirm({ message: 'Generate plan and write artifacts?', default: true });
+    if (!goAhead) {
+      console.log(chalk.dim('  Cancelled. Session saved — re-run to resume.\n'));
+      process.exit(0);
+    }
   }
 
   // ── Backup ─────────────────────────────────────────────────────────────────
@@ -460,7 +536,17 @@ export async function runInteractive(projectPath: string): Promise<InteractiveRu
     list.push(s);
     byFile.set(s.file, list);
   }
-  const refactorResults = Array.from(byFile.entries()).map(([file, suggestions]) => ({ file, suggestions }));
+  let refactorResults = Array.from(byFile.entries()).map(([file, suggestions]) => ({ file, suggestions }));
+
+  // Apply automated fixes if requested
+  if (interactiveOpts.apply) {
+    const applied = applyRefactors(codeSuggestions);
+    if (applied.length > 0) {
+      refactorResults = applied;
+      console.log(chalk.green(`  ✔ Applied automated fixes to ${applied.length} file(s)`));
+    }
+  }
+
   const manualActions = [...new Set(plan.steps.flatMap(s => s.manualActions))];
 
   const report: UpgradeReport = {
@@ -471,28 +557,54 @@ export async function runInteractive(projectPath: string): Promise<InteractiveRu
     refactorResults,
     manualActions,
     buildStatus: 'skipped',
+    decisions,
     generatedAt: new Date().toISOString(),
   };
+
+  // ── Build validation ───────────────────────────────────────────────────────
+  const runValidation = interactiveOpts.validate ?? niOpts.validate ?? false;
+  if (runValidation) {
+    const valSpinner = ora('Running build validation…').start();
+    try {
+      report.buildValidation = validateBuild({
+        projectPath: resolved,
+        packageManager: stack.packageManager,
+        steps: ['install', 'build', 'test', 'lint'],
+      });
+      const failed = report.buildValidation.filter(r => r.status === 'failed');
+      if (failed.length > 0) {
+        valSpinner.warn(`Build validation: ${failed.length} step(s) failed`);
+        report.buildStatus = 'failed';
+      } else {
+        valSpinner.succeed('Build validation passed');
+        report.buildStatus = 'success';
+      }
+    } catch (err) {
+      valSpinner.fail(`Build validation error: ${String(err)}`);
+    }
+  }
 
   // ── Write artifacts ────────────────────────────────────────────────────────
   const writeSpinner = ora(`Writing artifacts to ${outputDir}…`).start();
   const resolvedOutputDir = path.resolve(resolved, outputDir);
   let artifacts: Array<{ format: string; filePath: string }> = [];
   try {
-    artifacts = writeArtifacts(report, resolvedOutputDir, outputFormats);
+    const reportArtifacts = writeArtifacts(report, resolvedOutputDir, outputFormats);
+    const machineArtifacts = writeMachineArtifacts(report, resolvedOutputDir);
+    artifacts = [...reportArtifacts, ...machineArtifacts];
     writeSpinner.succeed(`Wrote ${artifacts.length} artifact(s)`);
   } catch (err) {
     writeSpinner.fail(`Could not write artifacts: ${String(err)}`);
   }
 
-  // ── Apply automated refactors (always off in interactive mode) ─────────────
-  // Users confirm per-file before applying — this is a future phase.
-  // Here we just report what could be auto-fixed.
-  const autoFixable = codeSuggestions.filter(s => s.change.automated);
-  if (autoFixable.length > 0) {
-    console.log('');
-    console.log(chalk.bold(`  ${chalk.green(String(autoFixable.length))} location(s) can be auto-fixed.`));
-    console.log(chalk.dim(`  Re-run with ${chalk.white('stack-lift upgrade . --apply')} to apply them.`));
+  // ── Auto-fix notice ────────────────────────────────────────────────────────
+  if (!interactiveOpts.apply) {
+    const autoFixable = codeSuggestions.filter(s => s.change.automated);
+    if (autoFixable.length > 0) {
+      console.log('');
+      console.log(chalk.bold(`  ${chalk.green(String(autoFixable.length))} location(s) can be auto-fixed.`));
+      console.log(chalk.dim(`  Re-run with ${chalk.white('stack-lift apply <path>')} to apply them.`));
+    }
   }
 
   // ── Checklist ──────────────────────────────────────────────────────────────

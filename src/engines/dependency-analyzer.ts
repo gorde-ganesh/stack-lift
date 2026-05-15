@@ -65,10 +65,13 @@ export async function analyzeDependencies(stack: StackInfo): Promise<DependencyA
           latest: 'unknown',
           type,
           risk: info.riskOverride ?? 'high',
+          riskCategory: 'deprecated',
           breakingChanges: false,
           deprecated: true,
           reason: info.deprecated,
           latestSource: 'inferred',
+          observedIn: 'package.json',
+          confidence: 'high',
         });
       }
       continue;
@@ -105,10 +108,13 @@ export async function analyzeDependencies(stack: StackInfo): Promise<DependencyA
         info.riskOverride,
         info.deprecated,
       ),
+      riskCategory: isDeprecated ? 'deprecated' : 'breaking-compatibility',
       breakingChanges: info.hasBreakingChanges,
       deprecated: isDeprecated,
       ...(isDeprecated && info.deprecated ? { reason: info.deprecated } : {}),
       latestSource: 'registry',
+      observedIn: stack.lockfileParsed ? 'package-lock.json' : 'package.json',
+      confidence: isDeprecated ? 'high' : 'high',
     });
   }
 

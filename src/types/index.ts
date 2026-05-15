@@ -1,5 +1,21 @@
 export type Framework = 'Angular' | 'React' | 'Vue' | 'Next.js' | 'Nuxt' | 'Svelte' | 'Unknown';
 
+/** How certain a claim is — always shown so users can calibrate. */
+export type Confidence = 'high' | 'medium' | 'low';
+
+/**
+ * Fine-grained risk category for a dependency finding.
+ * More specific than RiskLevel — used in findings.json and audit output.
+ */
+export type RiskCategory =
+  | 'breaking-compatibility'
+  | 'deprecated'
+  | 'abandoned'
+  | 'vulnerable'
+  | 'performance'
+  | 'modernization'
+  | 'optional';
+
 export type BuildTool =
   | 'Webpack'
   | 'Vite'
@@ -121,11 +137,17 @@ export interface DependencyInfo {
   latest: string;
   type: 'dependencies' | 'devDependencies';
   risk: RiskLevel;
+  /** Fine-grained risk category. */
+  riskCategory?: RiskCategory;
   breakingChanges: boolean;
   deprecated: boolean;
   reason?: string;
   /** How the latest version was determined. */
   latestSource: EvidenceSource;
+  /** Source file(s) where this dep was observed. */
+  observedIn?: string;
+  /** How confident we are in this finding. Defaults to 'medium' when unknown. */
+  confidence: Confidence;
 }
 
 export interface PeerDepConflict {
@@ -148,6 +170,8 @@ export interface BreakingChange {
   toVersion: string;
   category: BreakingChangeCategory;
   searchPattern?: string;
+  /** Confidence this breaking change applies to the project (inferred from static catalogue). Defaults to 'medium'. */
+  confidence?: Confidence;
 }
 
 export interface UpgradeStep {
@@ -192,6 +216,24 @@ export interface RefactorResult {
   diff?: string;
 }
 
+export interface BuildValidationResult {
+  step: 'install' | 'build' | 'test' | 'lint';
+  status: 'success' | 'failed' | 'skipped';
+  durationMs?: number;
+  output?: string;
+  error?: string;
+}
+
+export interface NonInteractiveOptions {
+  target?: string;
+  objective?: MigrationObjective;
+  yes?: boolean;
+  dryRun?: boolean;
+  outputFormats?: ArtifactFormat[];
+  outputDir?: string;
+  validate?: boolean;
+}
+
 export interface UpgradeReport {
   stack: StackInfo;
   plan: UpgradePlan;
@@ -200,6 +242,8 @@ export interface UpgradeReport {
   refactorResults: RefactorResult[];
   manualActions: string[];
   buildStatus: 'success' | 'failed' | 'skipped';
+  buildValidation?: BuildValidationResult[];
+  decisions?: Partial<MigrationDecisions>;
   generatedAt: string;
 }
 
