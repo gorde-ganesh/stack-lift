@@ -41,32 +41,54 @@ StackLift eliminates the research burden. It:
 
 ## Installation
 
+### Skill install (recommended)
+
 ```bash
-git clone https://github.com/gorde-ganesh/stack-lift ~/.claude/skills/stacklift
+# One-shot — no global install needed
+npx stack-lift skills add stacklift
+
+# Or install the CLI globally first, then use it anywhere
+npm install -g stack-lift
+skills add stacklift
 ```
 
-Once installed, invoke inside Claude Code:
+Both commands copy the skill into `~/.claude/skills/stacklift/`. Once it's there, invoke it inside Claude Code:
 
 ```
 /stacklift
 ```
 
-Claude will prompt you for a project path and target version, then run the full upgrade workflow.
+### Other skill commands
 
-### As a Standalone CLI
+```bash
+skills list                  # show installed skills
+skills search angular        # browse available skills
+skills remove stacklift      # uninstall a skill
+skills add stacklift --dir ./custom/path   # custom install dir
+```
+
+The same sub-commands are available under the `stack-lift` binary too:
+
+```bash
+stack-lift skills add stacklift
+stack-lift skills list
+stack-lift skills search
+```
+
+### Standalone CLI only
 
 **Requirements:** Node.js ≥ 18
 
 ```bash
-# From npm (once published)
 npm install -g stack-lift
+```
 
-# Or build from source
+Or build from source:
+
+```bash
 git clone https://github.com/gorde-ganesh/stack-lift
 cd stack-lift
-npm install
-npm run build
-npm link
+npm install && npm run build && npm link
 ```
 
 ---
