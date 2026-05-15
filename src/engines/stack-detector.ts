@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { StackInfo, Framework, BuildTool, PackageManager } from '../types/index.js';
+import type { StackInfo, Framework, BuildTool, PackageManager, TsconfigInfo } from '../types/index.js';
 
 function readJsonFile(filePath: string): Record<string, unknown> | null {
   try {
@@ -102,6 +102,73 @@ function readNodeVersion(projectPath: string, pkg: Record<string, unknown>): str
   return undefined;
 }
 
+/**
+ * Parse package-lock.json to extract the actual installed (resolved) version for each package.
+ * Supports lockfileVersion 1, 2, and 3.
+ */
+function parseLockfile(projectPath: string): { versions: Record<string, string>; parsed: boolean } {
+  const lockPath = path.join(projectPath, 'package-lock.json');
+  if (!fs.existsSync(lockPath)) return { versions: {}, parsed: false };
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(fs.readFileSync(lockPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    return { versions: {}, parsed: false };
+  }
+
+  const versions: Record<string, string> = {};
+
+  // v2/v3: packages map keyed as "node_modules/<pkg>"
+  const packages = raw['packages'] as Record<string, { version?: string }> | undefined;
+  if (packages) {
+    for (const [key, val] of Object.entries(packages)) {
+      if (!key.startsWith('node_modules/') || !val.version) continue;
+      const name = key.slice('node_modules/'.length);
+      versions[name] = val.version;
+    }
+    return { versions, parsed: true };
+  }
+
+  // v1: dependencies map keyed by package name
+  const deps = raw['dependencies'] as Record<string, { version?: string }> | undefined;
+  if (deps) {
+    for (const [name, val] of Object.entries(deps)) {
+      if (val.version) versions[name] = val.version;
+    }
+    return { versions, parsed: true };
+  }
+
+  return { versions: {}, parsed: false };
+}
+
+function readTsconfig(projectPath: string): TsconfigInfo | undefined {
+  const candidates = ['tsconfig.json', 'tsconfig.base.json'];
+  for (const name of candidates) {
+    const p = path.join(projectPath, name);
+    if (!fs.existsSync(p)) continue;
+    try {
+      const raw = JSON.parse(fs.readFileSync(p, 'utf-8')) as {
+        compilerOptions?: Record<string, unknown>;
+      };
+      const co = raw.compilerOptions;
+      if (!co) return {};
+      const info: TsconfigInfo = {};
+      if (co['strict'] !== undefined) info.strict = co['strict'] as boolean;
+      if (co['target'] !== undefined) info.target = co['target'] as string;
+      if (co['module'] !== undefined) info.module = co['module'] as string;
+      if (co['moduleResolution'] !== undefined) info.moduleResolution = co['moduleResolution'] as string;
+      if (co['useDefineForClassFields'] !== undefined) info.useDefineForClassFields = co['useDefineForClassFields'] as boolean;
+      if (co['experimentalDecorators'] !== undefined) info.experimentalDecorators = co['experimentalDecorators'] as boolean;
+      if (co['emitDecoratorMetadata'] !== undefined) info.emitDecoratorMetadata = co['emitDecoratorMetadata'] as boolean;
+      return info;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 function detectIsMonorepo(projectPath: string, pkg: Record<string, unknown>): boolean {
   // Yarn/npm workspaces
   if (pkg['workspaces']) return true;
@@ -131,6 +198,8 @@ export function detectStack(projectPath: string): StackInfo {
 
   const [framework, frameworkVersion] = detectFramework(deps, devDeps);
   const isMonorepo = detectIsMonorepo(resolved, pkg);
+  const { versions: resolvedVersions, parsed: lockfileParsed } = parseLockfile(resolved);
+  const tsconfig = readTsconfig(resolved);
 
   const nodeVersion = readNodeVersion(resolved, pkg);
   const tsVer = all['typescript'];
@@ -146,6 +215,9 @@ export function detectStack(projectPath: string): StackInfo {
     projectPath: resolved,
     rawDependencies: deps,
     rawDevDependencies: devDeps,
+    ...(lockfileParsed ? { resolvedVersions } : {}),
+    lockfileParsed,
+    ...(tsconfig !== undefined ? { tsconfig } : {}),
     isMonorepo,
   };
 }

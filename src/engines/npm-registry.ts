@@ -6,6 +6,8 @@ export interface RegistryPackageInfo {
   deprecated?: string;
   hasBreakingChanges: boolean;
   riskOverride?: RiskLevel;
+  /** peerDependencies declared by the latest published version. */
+  peerDependencies?: Record<string, string>;
 }
 
 interface CacheEntry {
@@ -87,6 +89,7 @@ async function fetchFromRegistry(packageName: string): Promise<RegistryPackageIn
       name: string;
       version: string;
       deprecated?: string;
+      peerDependencies?: Record<string, string>;
     };
 
     const knownDep = KNOWN_DEPRECATED[packageName];
@@ -98,6 +101,7 @@ async function fetchFromRegistry(packageName: string): Promise<RegistryPackageIn
       ...(deprecated ? { deprecated } : {}),
       hasBreakingChanges: KNOWN_BREAKING.has(packageName),
       ...(riskOverride ? { riskOverride } : {}),
+      ...(data.peerDependencies ? { peerDependencies: data.peerDependencies } : {}),
     };
   } catch {
     clearTimeout(timer);

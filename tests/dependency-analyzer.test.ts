@@ -40,7 +40,7 @@ beforeEach(() => {
 describe('analyzeDependencies', () => {
   it('flags deprecated tslint in Angular 12 project', async () => {
     const stack = detectStack(path.join(fixtures, 'angular-12'));
-    const deps = await analyzeDependencies(stack);
+    const { outdated: deps } = await analyzeDependencies(stack);
     const tslint = deps.find((d) => d.name === 'tslint');
     expect(tslint).toBeDefined();
     expect(tslint!.deprecated).toBe(true);
@@ -49,7 +49,7 @@ describe('analyzeDependencies', () => {
 
   it('flags deprecated codelyzer in Angular 12 project', async () => {
     const stack = detectStack(path.join(fixtures, 'angular-12'));
-    const deps = await analyzeDependencies(stack);
+    const { outdated: deps } = await analyzeDependencies(stack);
     const codelyzer = deps.find((d) => d.name === 'codelyzer');
     expect(codelyzer).toBeDefined();
     expect(codelyzer!.deprecated).toBe(true);
@@ -57,7 +57,7 @@ describe('analyzeDependencies', () => {
 
   it('flags outdated rxjs in Angular 12 project', async () => {
     const stack = detectStack(path.join(fixtures, 'angular-12'));
-    const deps = await analyzeDependencies(stack);
+    const { outdated: deps } = await analyzeDependencies(stack);
     const rxjs = deps.find((d) => d.name === 'rxjs');
     expect(rxjs).toBeDefined();
     expect(rxjs!.current).toBe('6.6.0');
@@ -65,7 +65,7 @@ describe('analyzeDependencies', () => {
 
   it('flags deprecated react-scripts in React 16 project', async () => {
     const stack = detectStack(path.join(fixtures, 'react-16'));
-    const deps = await analyzeDependencies(stack);
+    const { outdated: deps } = await analyzeDependencies(stack);
     const rs = deps.find((d) => d.name === 'react-scripts');
     expect(rs).toBeDefined();
     expect(rs!.deprecated).toBe(true);
@@ -75,7 +75,7 @@ describe('analyzeDependencies', () => {
 
   it('returns results sorted by risk (critical first)', async () => {
     const stack = detectStack(path.join(fixtures, 'angular-12'));
-    const deps = await analyzeDependencies(stack);
+    const { outdated: deps } = await analyzeDependencies(stack);
     const riskOrder = ['critical', 'high', 'medium', 'low'];
     for (let i = 1; i < deps.length; i++) {
       expect(riskOrder.indexOf(deps[i]!.risk)).toBeGreaterThanOrEqual(
@@ -84,9 +84,10 @@ describe('analyzeDependencies', () => {
     }
   });
 
-  it('returns an array for a project with tracked dependencies', async () => {
+  it('returns outdated array and peerConflicts for a project with tracked dependencies', async () => {
     const stack = detectStack(path.join(fixtures, 'react-17'));
-    const deps = await analyzeDependencies(stack);
-    expect(Array.isArray(deps)).toBe(true);
+    const result = await analyzeDependencies(stack);
+    expect(Array.isArray(result.outdated)).toBe(true);
+    expect(Array.isArray(result.peerConflicts)).toBe(true);
   });
 });

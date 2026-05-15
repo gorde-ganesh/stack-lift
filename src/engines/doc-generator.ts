@@ -1,4 +1,4 @@
-import type { UpgradeReport, BreakingChange, DependencyInfo } from '../types/index.js';
+import type { UpgradeReport, BreakingChange, DependencyInfo, PeerDepConflict } from '../types/index.js';
 
 const RISK_EMOJI: Record<string, string> = {
   critical: '🔴',
@@ -34,22 +34,49 @@ function changeTable(changes: BreakingChange[]): string {
   );
 }
 
-function depTable(deps: DependencyInfo[]): string {
+function depTable(deps: DependencyInfo[], lockfileParsed?: boolean): string {
   if (deps.length === 0) return '_All tracked dependencies are up to date._\n';
+
+  const sourceNote = lockfileParsed
+    ? '_Current versions read from lockfile (resolved). Latest from npm registry._'
+    : '_Current versions read from package.json ranges. No lockfile found — install exact versions may differ._';
 
   const rows = deps.map((d) => {
     const label = d.deprecated ? '⚠️ Deprecated' : 'Outdated';
     const reason = d.reason ? ` — ${d.reason}` : '';
-    return `| ${RISK_EMOJI[d.risk]} | \`${d.name}\` | ${d.current} | ${d.latest} | ${label}${reason} |`;
+    const sourceTag = d.latestSource === 'registry' ? '' : ' _(fallback)_';
+    return `| ${RISK_EMOJI[d.risk]} | \`${d.name}\` | ${d.current} | ${d.latest}${sourceTag} | ${label}${reason} |`;
   });
 
   return (
     [
+      sourceNote,
+      '',
       '| Risk | Package | Current | Latest | Note |',
       '|------|---------|---------|--------|------|',
       ...rows,
     ].join('\n') + '\n'
   );
+}
+
+function peerConflictTable(conflicts: PeerDepConflict[]): string {
+  if (conflicts.length === 0) return '';
+
+  const rows = conflicts.map((c) => {
+    const status = c.unresolvable ? '🔴 Unresolvable' : '🟠 Conflict';
+    return `| ${status} | \`${c.package}\` | \`${c.installedVersion}\` | \`${c.requiredRange}\` | \`${c.requiredBy}\` |`;
+  });
+
+  return [
+    '## Peer Dependency Conflicts',
+    '',
+    '> These packages were detected in your install but do not satisfy the peer requirement declared by another package. Verify against the actual lockfile before acting.',
+    '',
+    '| Status | Package | Installed | Required Range | Required By |',
+    '|--------|---------|-----------|----------------|-------------|',
+    ...rows,
+    '',
+  ].join('\n');
 }
 
 function buildCodeExamples(changes: BreakingChange[]): string {
@@ -75,7 +102,7 @@ function buildCodeExamples(changes: BreakingChange[]): string {
 }
 
 export function generateMarkdownReport(report: UpgradeReport): string {
-  const { stack, plan, outdatedDependencies, refactorResults, manualActions } = report;
+  const { stack, plan, outdatedDependencies, peerConflicts, refactorResults, manualActions } = report;
   const riskEmoji = RISK_EMOJI[plan.riskLevel];
 
   const sections: string[] = [];
@@ -92,7 +119,32 @@ export function generateMarkdownReport(report: UpgradeReport): string {
     ].join('\n'),
   );
 
+  // Evidence quality note
+  const lockfileNote = stack.lockfileParsed
+    ? '✅ Lockfile parsed — installed versions are exact.'
+    : '⚠️ No lockfile found — installed versions estimated from package.json ranges.';
+  const tsconfigNote = stack.tsconfig ? '✅ tsconfig.json read.' : '⚠️ tsconfig.json not found.';
+
+  sections.push(
+    [
+      '## Evidence Sources',
+      '',
+      `| Source | Status |`,
+      `|--------|--------|`,
+      `| package.json | ✅ Read directly |`,
+      `| Lockfile (resolved versions) | ${lockfileNote} |`,
+      `| tsconfig.json | ${tsconfigNote} |`,
+      `| npm registry (latest versions) | ✅ Live query at report generation time |`,
+      `| Breaking change catalogue | ℹ️ Inferred from static knowledge base — verify against official migration guide |`,
+      '',
+    ].join('\n'),
+  );
+
   // Summary
+  const tsInfo = stack.tsconfig
+    ? `${stack.typescript ?? 'not detected'} (strict: ${stack.tsconfig.strict ?? 'not set'})`
+    : (stack.typescript ?? 'not detected');
+
   sections.push(
     [
       '## Summary',
@@ -101,12 +153,13 @@ export function generateMarkdownReport(report: UpgradeReport): string {
       `|---|---|`,
       `| **Framework** | ${stack.framework} ${stack.frameworkVersion} |`,
       `| **Target** | ${stack.framework} ${plan.toVersion} |`,
-      `| **TypeScript** | ${stack.typescript ?? 'not detected'} |`,
+      `| **TypeScript** | ${tsInfo} |`,
       `| **Build tool** | ${stack.buildTool} |`,
       `| **Package manager** | ${stack.packageManager} |`,
       `| **Strategy** | ${plan.strategy === 'incremental' ? `Incremental (${plan.steps.length} steps)` : 'Direct'} |`,
       `| **Risk level** | ${riskEmoji} ${plan.riskLevel.toUpperCase()} |`,
       `| **Estimated effort** | ${plan.estimatedEffort} |`,
+      `| **Effort basis** | ${plan.effortBasis} |`,
       `| **Breaking changes** | ${plan.totalBreakingChanges} (${plan.totalAutomatedFixes} auto-fixable) |`,
       '',
     ].join('\n'),
@@ -125,7 +178,12 @@ export function generateMarkdownReport(report: UpgradeReport): string {
   );
 
   // Outdated dependencies
-  sections.push(['## Outdated Dependencies', '', depTable(outdatedDependencies), ''].join('\n'));
+  sections.push(['## Outdated Dependencies', '', depTable(outdatedDependencies, stack.lockfileParsed), ''].join('\n'));
+
+  // Peer conflicts
+  if (peerConflicts.length > 0) {
+    sections.push(peerConflictTable(peerConflicts));
+  }
 
   // Step-by-step breakdown
   sections.push('## Step-by-Step Upgrade Details\n');
@@ -133,11 +191,17 @@ export function generateMarkdownReport(report: UpgradeReport): string {
   for (const step of plan.steps) {
     const allChanges = step.breakingChanges;
 
+    const refLink = step.referenceUrl
+      ? `\n> 📖 Official guide: [Angular Update Guide](${step.referenceUrl})\n`
+      : '';
+
     sections.push(
       [
         `### Step: v${step.fromVersion} → v${step.toVersion}`,
         '',
         `> ${step.description}`,
+        refLink,
+        '> ℹ️ Breaking changes below are from the static knowledge catalogue. Verify each against the official migration guide before applying.',
         '',
         '#### Breaking Changes',
         '',

@@ -1,6 +1,6 @@
 import semver from 'semver';
 import { getPackageInfoBatch } from './npm-registry.js';
-import type { StackInfo, DependencyInfo, RiskLevel } from '../types/index.js';
+import type { StackInfo, DependencyInfo, PeerDepConflict, RiskLevel } from '../types/index.js';
 
 function stripRange(version: string): string {
   return (version.replace(/^[\^~>=<*]+/, '').split(' ')[0] ?? '').split('-')[0] ?? '';
@@ -26,13 +26,18 @@ function classifyRisk(
   return 'low';
 }
 
+export interface DependencyAnalysis {
+  outdated: DependencyInfo[];
+  peerConflicts: PeerDepConflict[];
+}
+
 /**
  * Analyze all dependencies in a project against the live npm registry.
  * Falls back to local deprecation knowledge if the registry is unreachable.
  *
  * This function is async because it queries the npm registry.
  */
-export async function analyzeDependencies(stack: StackInfo): Promise<DependencyInfo[]> {
+export async function analyzeDependencies(stack: StackInfo): Promise<DependencyAnalysis> {
   const allDeps = new Map<string, { version: string; type: 'dependencies' | 'devDependencies' }>();
 
   for (const [name, version] of Object.entries(stack.rawDependencies)) {
@@ -47,14 +52,14 @@ export async function analyzeDependencies(stack: StackInfo): Promise<DependencyI
   const packageNames = Array.from(allDeps.keys());
   const registryData = await getPackageInfoBatch(packageNames);
 
-  const results: DependencyInfo[] = [];
+  const outdated: DependencyInfo[] = [];
 
   for (const [name, { version, type }] of allDeps) {
     const info = registryData.get(name);
     if (!info || info.latest === 'unknown') {
       // If deprecated but no version info, still surface it
       if (info?.deprecated) {
-        results.push({
+        outdated.push({
           name,
           current: stripRange(version),
           latest: 'unknown',
@@ -63,12 +68,14 @@ export async function analyzeDependencies(stack: StackInfo): Promise<DependencyI
           breakingChanges: false,
           deprecated: true,
           reason: info.deprecated,
+          latestSource: 'inferred',
         });
       }
       continue;
     }
 
-    const current = stripRange(version);
+    // Prefer lockfile-resolved version over package.json range for accuracy
+    const current = stack.resolvedVersions?.[name] ?? stripRange(version);
     const latest = info.latest;
 
     let isOutdated = false;
@@ -86,7 +93,7 @@ export async function analyzeDependencies(stack: StackInfo): Promise<DependencyI
 
     if (!isOutdated && !isDeprecated) continue;
 
-    results.push({
+    outdated.push({
       name,
       current,
       latest,
@@ -101,9 +108,42 @@ export async function analyzeDependencies(stack: StackInfo): Promise<DependencyI
       breakingChanges: info.hasBreakingChanges,
       deprecated: isDeprecated,
       ...(isDeprecated && info.deprecated ? { reason: info.deprecated } : {}),
+      latestSource: 'registry',
     });
   }
 
   const riskOrder: RiskLevel[] = ['critical', 'high', 'medium', 'low'];
-  return results.sort((a, b) => riskOrder.indexOf(a.risk) - riskOrder.indexOf(b.risk));
+  outdated.sort((a, b) => riskOrder.indexOf(a.risk) - riskOrder.indexOf(b.risk));
+
+  // Detect peer dependency conflicts: for each package whose latest version declares
+  // peerDependencies, check whether the currently-installed peers satisfy those ranges.
+  const peerConflicts: PeerDepConflict[] = [];
+  for (const [name] of allDeps) {
+    const info = registryData.get(name);
+    if (!info?.peerDependencies) continue;
+
+    for (const [peer, requiredRange] of Object.entries(info.peerDependencies)) {
+      const installedEntry = allDeps.get(peer);
+      if (!installedEntry) continue;
+
+      const installedVersion =
+        stack.resolvedVersions?.[peer] ?? stripRange(installedEntry.version);
+      const coerced = semver.coerce(installedVersion);
+      if (!coerced) continue;
+
+      const satisfies = semver.satisfies(coerced, requiredRange, { includePrerelease: false });
+      if (!satisfies) {
+        peerConflicts.push({
+          package: peer,
+          installedVersion,
+          requiredRange,
+          requiredBy: name,
+          // Mark unresolvable when the required range and installed version don't overlap at all
+          unresolvable: !semver.validRange(requiredRange),
+        });
+      }
+    }
+  }
+
+  return { outdated, peerConflicts };
 }

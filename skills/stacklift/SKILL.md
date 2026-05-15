@@ -27,6 +27,56 @@ You combine deep knowledge of Angular, React, and TypeScript release histories w
 
 ---
 
+## Evidence Standards — Non-Negotiable
+
+Every claim in your report must be classified. Never present inferences as facts.
+
+### Claim classification
+
+| Label | When to use |
+|-------|-------------|
+| **Observed** | You read it directly from a file (package.json version, tsconfig option, grep match) |
+| **Registry** | You fetched it from the npm registry during this run |
+| **Inferred** | You derived it from a rule or pattern — always state the rule |
+
+### Prohibited language
+
+Never use the following without an explicit evidence label and the source:
+- "almost certainly", "likely", "probably", "presumably", "I suspect"
+- "must have been installed with ..."
+- "this was likely caused by ..."
+- Any claim about CI behavior, install flags, or runtime behavior you have not verified
+
+**Instead**, say:
+- "package.json declares `primeng@13` — _observed_"
+- "npm registry returns `primeng@17.18.0` as latest — _registry_"
+- "peer mismatch between `primeng@13` and `@angular/core@16`'s peer range — _inferred from registry peerDependencies_"
+
+### Effort estimates
+
+Effort estimates are always heuristic. Always show the basis:
+- ✅ "2–5 days (based on 8 catalogued breaking changes and 12 manual actions)"
+- ❌ "2–5 days" with no explanation
+
+Remind the user that actual effort depends on codebase size, test coverage, and CI complexity — none of which StackLift measures directly.
+
+### Citations
+
+For every Angular or React version hop, link to the official migration guide (provided in the knowledge base `referenceUrl` field). Never invent or guess migration guide URLs.
+
+---
+
+## install flag policy
+
+Never recommend `npm install --legacy-peer-deps` as a default or first step.
+
+If peer conflicts exist:
+1. List the exact conflicts with required ranges
+2. Recommend resolving each conflict by upgrading the conflicting package
+3. Only mention `--legacy-peer-deps` as a last-resort fallback, with a warning that it masks unsatisfied peer requirements and can result in a broken install tree
+
+---
+
 ## When to Use
 
 Invoke this skill when the user wants to:
@@ -43,7 +93,7 @@ Invoke this skill when the user wants to:
 ## Supported Frameworks
 
 ### Frontend Frameworks
-- **Angular** — versions 10 through 18, one major hop at a time
+- **Angular** — versions 10 through 20, one major hop at a time
 - **React** — versions 16 through 19
 - **Next.js** — basic detection (full support in v2)
 - **Vue / Nuxt / Svelte** — detection only (full support in v2)
@@ -107,19 +157,28 @@ Extract and report:
 
 ### Step 2 — Analyze Dependencies
 
-Scan `dependencies` and `devDependencies` in `package.json`. For each package, determine:
+Read `package.json` for declared versions. If `package-lock.json` is present, read resolved (exact installed) versions from it — these take precedence over the ranges in package.json.
 
-- Current installed version
-- Latest stable version
-- Whether it is **deprecated** or **abandoned**
-- Whether the upgrade involves breaking changes
+For each package, determine:
+
+- **Current installed version** — _observed from lockfile_ or _observed from package.json range_
+- **Latest stable version** — _from npm registry_ (live query; never hardcoded)
+- Whether it is **deprecated** or **abandoned** — _registry or known-deprecation catalogue_
+- Whether the upgrade involves breaking changes — _inferred from known-breaking list_
 - Risk level: `critical` / `high` / `medium` / `low`
+- Peer dependency conflicts — compare installed peer packages against the `peerDependencies` declared by the latest version of each dependency
+
+Always state evidence source next to each claim:
+```
+primeng: 13.0.0 (observed, lockfile) → 17.18.0 (registry)
+Peer conflict: primeng@17 requires @angular/core >=16, installed @angular/core@13 (inferred from registry peerDependencies)
+```
 
 Flag with `critical` or `high`:
 
 - Any package with a known deprecation notice (tslint, codelyzer, node-sass, react-scripts, moment, @angular/http, babel-core)
 - Any package more than 2 major versions behind
-- Any peer-dependency conflict with the target framework version
+- Any peer-dependency conflict with the target framework version that cannot be resolved by upgrading the conflicting package alone
 
 Flag with `medium`:
 
@@ -333,7 +392,7 @@ See `examples/` for worked migration requests:
 - **No runtime execution**: StackLift reads and analyzes files. It does not run `npm install`, `ng build`, or test suites. Validate the output with an actual build.
 - **Knowledge cutoff**: Breaking change data is current as of the knowledge base version. Always verify against official migration guides for the latest patch releases.
 - **Private packages**: Cannot analyze packages not in the npm registry.
-- **Monorepos**: Handles single-package projects best. For monorepos, analyze each workspace package separately.
+- **Monorepos**: When a monorepo is detected (workspaces, nx.json, lerna.json, turbo.json), note that root-level tsconfig, shared builders, and common library packages affect all projects. Analyze each workspace package's package.json independently, but flag root-level shared dependencies explicitly. Do not say "analyze each project independently" without first reading the root package.json and workspace config.
 - **Runtime behavior**: Cannot detect runtime-only regressions (e.g. timing-sensitive effects in React 18 concurrent mode). Always run tests after upgrading.
 - **Custom webpack configs**: Complex Webpack setups with custom loaders may require manual Vite migration analysis beyond what StackLift can automate.
 - **Backend upgrades**: Out of scope in v1. Node.js, Express, NestJS, Django — planned for v2.

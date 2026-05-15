@@ -26,7 +26,7 @@ export async function runUpgrade(options: AnalyzeOptions): Promise<OrchestratorR
   const stack: StackInfo = detectStack(projectPath);
 
   // 2. Analyze dependencies (async — queries npm registry with fallback)
-  const outdatedDependencies = await analyzeDependencies(stack);
+  const { outdated: outdatedDependencies, peerConflicts } = await analyzeDependencies(stack);
 
   // 3. Plan upgrade
   const plan: UpgradePlan = planUpgrade(stack, targetVersion);
@@ -59,6 +59,7 @@ export async function runUpgrade(options: AnalyzeOptions): Promise<OrchestratorR
     stack,
     plan,
     outdatedDependencies,
+    peerConflicts,
     refactorResults,
     manualActions,
     buildStatus: 'skipped',

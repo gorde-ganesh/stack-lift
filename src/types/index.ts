@@ -23,6 +23,24 @@ export type BreakingChangeCategory =
   | 'import'
   | 'behavior';
 
+/**
+ * How a claim was established. Drives the evidence label shown in reports.
+ * - observed: read directly from a file (package.json version, tsconfig option)
+ * - inferred: derived from static rules (KNOWN_BREAKING set, effort heuristic)
+ * - registry: live npm registry response
+ */
+export type EvidenceSource = 'observed' | 'inferred' | 'registry';
+
+export interface TsconfigInfo {
+  strict?: boolean;
+  target?: string;
+  module?: string;
+  moduleResolution?: string;
+  useDefineForClassFields?: boolean;
+  experimentalDecorators?: boolean;
+  emitDecoratorMetadata?: boolean;
+}
+
 export interface StackInfo {
   framework: Framework;
   frameworkVersion: string;
@@ -34,6 +52,12 @@ export interface StackInfo {
   projectPath: string;
   rawDependencies: Record<string, string>;
   rawDevDependencies: Record<string, string>;
+  /** Resolved versions from the lockfile (more accurate than package.json ranges). */
+  resolvedVersions?: Record<string, string>;
+  /** Whether lockfile was present and parsed successfully. */
+  lockfileParsed?: boolean;
+  /** Key compiler options read from tsconfig.json. */
+  tsconfig?: TsconfigInfo;
   isMonorepo?: boolean;
 }
 
@@ -46,6 +70,17 @@ export interface DependencyInfo {
   breakingChanges: boolean;
   deprecated: boolean;
   reason?: string;
+  /** How the latest version was determined. */
+  latestSource: EvidenceSource;
+}
+
+export interface PeerDepConflict {
+  package: string;
+  installedVersion: string;
+  requiredRange: string;
+  requiredBy: string;
+  /** True if there is no published version that satisfies both the target framework and current constraint. */
+  unresolvable: boolean;
 }
 
 export interface BreakingChange {
@@ -69,6 +104,8 @@ export interface UpgradeStep {
   automatedFixes: number;
   manualActions: string[];
   npmInstall: string[];
+  /** Official migration guide URL for this hop. */
+  referenceUrl?: string;
 }
 
 export interface UpgradePlan {
@@ -81,6 +118,8 @@ export interface UpgradePlan {
   totalAutomatedFixes: number;
   riskLevel: RiskLevel;
   estimatedEffort: string;
+  /** Basis for the effort estimate — always shown so users can calibrate. */
+  effortBasis: string;
 }
 
 export interface CodeSuggestion {
@@ -103,6 +142,7 @@ export interface UpgradeReport {
   stack: StackInfo;
   plan: UpgradePlan;
   outdatedDependencies: DependencyInfo[];
+  peerConflicts: PeerDepConflict[];
   refactorResults: RefactorResult[];
   manualActions: string[];
   buildStatus: 'success' | 'failed' | 'skipped';

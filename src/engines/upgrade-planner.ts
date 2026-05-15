@@ -26,15 +26,16 @@ function computeRisk(steps: UpgradeStep[]): RiskLevel {
   return 'low';
 }
 
-function estimateEffort(steps: UpgradeStep[]): string {
+function estimateEffort(steps: UpgradeStep[]): { effort: string; basis: string } {
   const totalChanges = steps.flatMap((s) => s.breakingChanges).length;
   const manualCount = steps.flatMap((s) => s.manualActions).length;
+  const basis = `${totalChanges} catalogued breaking changes, ${manualCount} manual actions across ${steps.length} hop(s) — does not account for codebase size, test coverage, or CI complexity`;
 
-  if (totalChanges === 0 && manualCount <= 2) return '1–2 hours';
-  if (totalChanges <= 3 && manualCount <= 5) return '2–4 hours';
-  if (totalChanges <= 6) return '1–2 days';
-  if (totalChanges <= 12) return '2–5 days';
-  return '1–2 weeks';
+  if (totalChanges === 0 && manualCount <= 2) return { effort: '1–2 hours', basis };
+  if (totalChanges <= 3 && manualCount <= 5) return { effort: '2–4 hours', basis };
+  if (totalChanges <= 6) return { effort: '1–2 days', basis };
+  if (totalChanges <= 12) return { effort: '2–5 days', basis };
+  return { effort: '1–2 weeks', basis };
 }
 
 function resolveTargetVersion(stack: StackInfo, requestedTarget?: string): string {
@@ -92,6 +93,7 @@ export function planUpgrade(stack: StackInfo, targetVersion?: string): UpgradePl
   const strategy = steps.length > 1 ? 'incremental' : 'direct';
   const totalBreakingChanges = steps.reduce((n, s) => n + s.breakingChanges.length, 0);
   const totalAutomatedFixes = steps.reduce((n, s) => n + s.automatedFixes, 0);
+  const { effort, basis } = estimateEffort(steps);
 
   return {
     framework,
@@ -102,6 +104,7 @@ export function planUpgrade(stack: StackInfo, targetVersion?: string): UpgradePl
     totalBreakingChanges,
     totalAutomatedFixes,
     riskLevel: computeRisk(steps),
-    estimatedEffort: estimateEffort(steps),
+    estimatedEffort: effort,
+    effortBasis: basis,
   };
 }
