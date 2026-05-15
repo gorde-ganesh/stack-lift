@@ -30,12 +30,13 @@ Upgrading a legacy frontend project is one of the most expensive recurring engin
 
 StackLift eliminates the research burden. It:
 
-1. **Detects** your project's exact stack — framework, version, build tool, TypeScript, RxJS, and package manager
+1. **Detects** your project's exact stack — framework, version, build tool, TypeScript, RxJS, package manager, and monorepo layout
 2. **Plans** a safe incremental upgrade route (never skips a major version where doing so breaks things)
 3. **Inventories** every breaking change between your current and target version
-4. **Scans** your source tree to locate which files need attention
-5. **Applies** automated fixes where possible (regex-safe transforms: import rewrites, API renames)
-6. **Documents** everything — a markdown report with code examples, a manual-action checklist, and a rollback plan
+4. **Queries** the live npm registry to find outdated and deprecated packages — with caching, timeouts, and offline fallback
+5. **Scans** your source tree to locate which files need attention
+6. **Applies** automated fixes using AST transforms — not regex — so rewrites are structurally correct
+7. **Documents** everything — a markdown report with code examples, a manual-action checklist, and a rollback plan
 
 ---
 
@@ -98,7 +99,7 @@ npm install && npm run build && npm link
 ### CLI
 
 ```bash
-# Detect stack and list outdated packages
+# Detect stack and list outdated packages (queries live npm registry)
 stack-lift analyze ./my-project
 
 # Show the upgrade path and risk level without writing anything
@@ -113,8 +114,11 @@ stack-lift upgrade ./my-project --to 18 --output markdown
 # Write a machine-readable JSON report
 stack-lift upgrade ./my-project --to 18 --output json
 
-# Apply automated code fixes in-place
+# Apply automated AST-based code fixes in-place
 stack-lift upgrade ./my-project --to 18 --apply
+
+# Preview what automated fixes would change, without writing any files
+stack-lift upgrade ./my-project --to 18 --apply --dry-run
 ```
 
 ### AI Skill (Claude Code)
@@ -134,15 +138,19 @@ Claude will run the full analysis workflow and stream results back with inline c
 
 ### Phase 1 (current)
 
-| Framework | Versions covered |
-|-----------|-----------------|
-| Angular   | 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 |
-| React     | 16 → 17 → 18 → 19 |
-| TypeScript | 4.x → 5.x |
+| Framework  | Versions covered                                          |
+|------------|----------------------------------------------------------|
+| Angular    | 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18              |
+| React      | 16 → 17 → 18 → 19                                        |
+| TypeScript | 4.x → 5.x                                                |
 
 ### Detected build tooling
 
 Webpack, Vite, Parcel, Rollup, Create React App, Angular CLI
+
+### Monorepo detection
+
+StackLift automatically detects monorepo layouts and warns you to analyze each workspace package individually. Detected via: `workspaces` in `package.json`, `pnpm-workspace.yaml`, `lerna.json`, `nx.json`, `turbo.json`.
 
 ### Phase 2 (planned)
 
@@ -155,30 +163,32 @@ Node.js, Express, NestJS, Next.js, Nuxt, Vue, Svelte
 ```
 stack-lift/
 ├── src/
-│   ├── cli.ts                       # Commander CLI entry point
-│   ├── index.ts                     # Public library API
+│   ├── cli.ts                           # Commander CLI entry point
+│   ├── index.ts                         # Public library API
 │   ├── types/
-│   │   └── index.ts                 # Shared TypeScript types
+│   │   └── index.ts                     # Shared TypeScript types
 │   ├── knowledge/
-│   │   ├── angular.ts               # Angular breaking changes per major hop
-│   │   ├── react.ts                 # React breaking changes per major hop
-│   │   └── typescript.ts            # TypeScript upgrade notes
+│   │   ├── angular.ts                   # Angular breaking changes per major hop
+│   │   ├── react.ts                     # React breaking changes per major hop
+│   │   └── typescript.ts               # TypeScript upgrade notes
 │   └── engines/
-│       ├── stack-detector.ts        # Reads project files → StackInfo
-│       ├── dependency-analyzer.ts   # Compares installed vs latest/deprecated
-│       ├── upgrade-planner.ts       # Builds safe incremental upgrade path
-│       ├── breaking-change-analyzer.ts  # Greps source for affected patterns
-│       ├── refactor-engine.ts       # Applies automated text transforms
-│       ├── doc-generator.ts         # Renders markdown/JSON reports
-│       └── orchestrator.ts          # Wires all engines into runUpgrade()
+│       ├── stack-detector.ts            # Reads project files → StackInfo
+│       ├── npm-registry.ts              # Live npm registry client with cache
+│       ├── dependency-analyzer.ts       # Compares installed vs latest/deprecated
+│       ├── upgrade-planner.ts           # Builds safe incremental upgrade path
+│       ├── breaking-change-analyzer.ts  # Scans source for affected patterns
+│       ├── refactor-engine.ts           # AST-based automated code transforms
+│       ├── path-guard.ts                # Path traversal security guard
+│       ├── doc-generator.ts             # Renders markdown/JSON reports
+│       └── orchestrator.ts             # Wires all engines into runUpgrade()
 ├── skills/
 │   └── stacklift/
-│       ├── SKILL.md                 # skills.sh skill definition
-│       ├── examples/                # Worked upgrade examples
-│       └── templates/               # Reusable report templates
+│       ├── SKILL.md                     # skills.sh skill definition
+│       ├── examples/                    # Worked upgrade examples
+│       └── templates/                  # Reusable report templates
 └── tests/
-    ├── fixtures/                    # Sample project package.json files
-    └── *.test.ts                    # Unit tests (vitest)
+    ├── fixtures/                        # Sample project package.json files
+    └── *.test.ts                        # Unit tests (vitest)
 ```
 
 ### Engine pipeline
@@ -186,7 +196,9 @@ stack-lift/
 ```
 User project
     ↓
-stack-detector        — framework, version, build tool, package manager
+stack-detector        — framework, version, build tool, package manager, monorepo
+    ↓
+npm-registry          — live latest/deprecated data (5-min cache, offline fallback)
     ↓
 dependency-analyzer   — outdated / deprecated packages, risk levels
     ↓
@@ -194,10 +206,34 @@ upgrade-planner       — incremental version path, total breaking changes
     ↓
 breaking-change-analyzer  — source file locations needing attention
     ↓
-refactor-engine       — automated fix application (optional)
+refactor-engine       — AST transforms via ts-morph (optional --apply)
     ↓
 doc-generator         — markdown / JSON / terminal output
 ```
+
+### Live npm registry
+
+The dependency analyzer queries `registry.npmjs.org` for every package in your `package.json`:
+
+- Results are cached in-process for 5 minutes
+- Each request has a 4-second timeout with `AbortController`
+- If the registry is unreachable, a built-in `KNOWN_DEPRECATED` map provides offline fallback for common packages (tslint, node-sass, react-scripts, moment, etc.)
+
+### AST-based refactors
+
+Automated code fixes use [ts-morph](https://ts-morph.com/) to manipulate the TypeScript/JavaScript AST directly — never regex on raw source text. Supported transforms:
+
+| Pattern | Transform |
+|---------|-----------|
+| `TestBed.get(T)` | → `TestBed.inject(T)` |
+| `ReactDOM.render(<App />, el)` | → `createRoot(el).render(<App />)` |
+| `ReactDOM.hydrate(jsx, el)` | → `hydrateRoot(el, jsx)` |
+| `import { HttpModule } from '@angular/http'` | → `@angular/common/http` with `HttpClientModule` |
+| `initialNavigation: 'enabled'` | → `'enabledBlocking'` |
+
+### Security
+
+All project paths are validated by `path-guard.ts` before any filesystem access. Paths outside `$HOME`, `$TMPDIR`, and the current working directory are rejected to prevent path traversal.
 
 ---
 
@@ -215,7 +251,7 @@ Output: `UPGRADE_REPORT.md` containing:
 - 18 breaking changes across all steps
 - 5 automated fixes (TestBed.get, initialNavigation, control-flow syntax)
 - Per-step npm install commands
-- Manual action checklist (37 items)
+- Manual action checklist
 - Rollback instructions
 
 ### React 17 → 18
@@ -241,7 +277,7 @@ Flags for manual attention:
 stack-lift analyze ./legacy-app
 ```
 
-Flags in seconds:
+Flags in seconds (querying the live npm registry):
 
 - `tslint` — deprecated, migrate to `@typescript-eslint`
 - `node-sass` — deprecated, replace with `sass` (Dart Sass)
@@ -258,10 +294,10 @@ Contributions are welcome. The most valuable additions are:
 Adding breaking changes for framework versions not yet covered. Each entry needs: `api`, `description`, `before`/`after` examples, `automated` flag, `severity`, `searchPattern`.
 
 **Automated refactor patterns** (`src/engines/refactor-engine.ts`)
-Safe regex transforms for known automated migrations.
+AST transforms using ts-morph for known automated migrations. Add a new function following the `replaceTestBedGet` pattern and register it in `TRANSFORM_MAP`.
 
 **New framework support**
-Vue, Nuxt, Next.js, Svelte, NestJS — follow the Angular/React pattern.
+Vue, Nuxt, Next.js, Svelte, NestJS — follow the Angular/React pattern in `src/knowledge/`.
 
 ### Development setup
 
@@ -269,18 +305,23 @@ Vue, Nuxt, Next.js, Svelte, NestJS — follow the Angular/React pattern.
 git clone https://github.com/gorde-ganesh/stack-lift
 cd stack-lift
 npm install
-npm test          # 23 unit tests
-npm run build     # tsup → dist/
+npm test            # 23 unit tests
+npm run build       # tsup → dist/
 npm run dev -- upgrade ./path/to/project --to 18
 ```
 
-### Running tests
+### Quality checks
 
 ```bash
-npm test          # run once
-npm run test:watch  # watch mode
-npm run typecheck   # tsc --noEmit
+npm run typecheck     # tsc --noEmit (strict: noUncheckedIndexedAccess, exactOptionalPropertyTypes)
+npm run lint          # ESLint with @typescript-eslint/recommended-type-checked
+npm run format:check  # Prettier check
+npm test              # Vitest unit tests
+npm run build         # tsup ESM + DTS build
+npm pack --dry-run    # Validate package contents
 ```
+
+CI runs all of the above across Node.js 18, 20, and 22 on every push and pull request.
 
 ---
 
