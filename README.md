@@ -41,13 +41,7 @@ StackLift eliminates the research burden. It:
 
 ## Installation
 
-### As a skills.sh AI Skill
-
 ```bash
-# Install via skills.sh CLI
-skills install stacklift
-
-# Or clone directly
 git clone https://github.com/gorde-ganesh/stack-lift ~/.claude/skills/stacklift
 ```
 
