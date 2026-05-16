@@ -1,6 +1,6 @@
 {
   "name": "stack-lift",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "AI-powered upgrade assistant for modernizing Angular, React, and legacy frontend codebases",
   "type": "module",
   "bin": {
