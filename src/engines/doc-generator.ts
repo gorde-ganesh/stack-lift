@@ -116,7 +116,8 @@ function buildCodeExamples(changes: BreakingChange[]): string {
 }
 
 export function generateMarkdownReport(report: UpgradeReport): string {
-  const { stack, plan, outdatedDependencies, peerConflicts, refactorResults, manualActions } = report;
+  const { stack, plan, outdatedDependencies, peerConflicts, refactorResults, manualActions } =
+    report;
   const riskEmoji = RISK_EMOJI[plan.riskLevel];
 
   const sections: string[] = [];
@@ -192,7 +193,11 @@ export function generateMarkdownReport(report: UpgradeReport): string {
   );
 
   // Outdated dependencies
-  sections.push(['## Outdated Dependencies', '', depTable(outdatedDependencies, stack.lockfileParsed), ''].join('\n'));
+  sections.push(
+    ['## Outdated Dependencies', '', depTable(outdatedDependencies, stack.lockfileParsed), ''].join(
+      '\n',
+    ),
+  );
 
   // Peer conflicts
   if (peerConflicts.length > 0) {
@@ -280,11 +285,20 @@ export function generateMarkdownReport(report: UpgradeReport): string {
         const base = baseline.find((b) => b.step === r.step);
         let classification = '';
         if (base) {
-          if (base.status !== 'failed' && r.status === 'failed') classification = ' ⚠️ migration-induced';
-          else if (base.status === 'failed' && r.status === 'failed') classification = ' (pre-existing)';
-          else if (base.status === 'skipped' && r.status === 'skipped') classification = ' (no script)';
+          if (base.status !== 'failed' && r.status === 'failed')
+            classification = ' ⚠️ migration-induced';
+          else if (base.status === 'failed' && r.status === 'failed')
+            classification = ' (pre-existing)';
+          else if (base.status === 'skipped' && r.status === 'skipped')
+            classification = ' (no script)';
         }
-        const baseIcon = base ? (base.status === 'success' ? '✅' : base.status === 'failed' ? '❌' : '⏭️') : '—';
+        const baseIcon = base
+          ? base.status === 'success'
+            ? '✅'
+            : base.status === 'failed'
+              ? '❌'
+              : '⏭️'
+          : '—';
         return `| ${r.step} | ${baseIcon} | ${icon}${dur} | ${r.status}${classification} |${err}`;
       }
 

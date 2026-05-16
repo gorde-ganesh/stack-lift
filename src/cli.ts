@@ -12,7 +12,12 @@ import { runInteractive } from './engines/interaction.js';
 import { readSession, clearSession } from './engines/session.js';
 import { validateBuild } from './engines/build-validator.js';
 import { installSkill, removeSkill, listSkills, searchSkills } from './skills/manager.js';
-import type { UpgradeReport, RiskLevel, ArtifactFormat, MigrationObjective } from './types/index.js';
+import type {
+  UpgradeReport,
+  RiskLevel,
+  ArtifactFormat,
+  MigrationObjective,
+} from './types/index.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -147,14 +152,19 @@ function printTerminalReport(report: UpgradeReport) {
 
 // ── Audit helpers ────────────────────────────────────────────────────────────
 
-async function runAudit(projectPath: string, options: { json?: boolean; markdown?: boolean; outDir?: string }) {
+async function runAudit(
+  projectPath: string,
+  options: { json?: boolean; markdown?: boolean; outDir?: string },
+) {
   const spinner = ora('Auditing project (read-only)…').start();
   try {
     const resolved = path.resolve(projectPath);
     const stack = detectStack(resolved);
     spinner.text = 'Querying npm registry…';
     const { outdated, peerConflicts } = await analyzeDependencies(stack);
-    spinner.succeed(`Audit complete: ${outdated.length} findings, ${peerConflicts.length} peer conflicts`);
+    spinner.succeed(
+      `Audit complete: ${outdated.length} findings, ${peerConflicts.length} peer conflicts`,
+    );
 
     // Print findings grouped by risk category
     console.log('');
@@ -162,11 +172,16 @@ async function runAudit(projectPath: string, options: { json?: boolean; markdown
     console.log(chalk.bold.blue('  ║              stack-lift audit              ║'));
     console.log(chalk.bold.blue('  ╚══════════════════════════════════════════╝'));
     console.log('');
-    console.log(chalk.bold(`  ${stack.framework} ${stack.frameworkVersion}`) + chalk.dim(` — ${stack.packageManager} — lockfile: ${stack.lockfileParsed ? 'parsed' : 'not found'}`));
+    console.log(
+      chalk.bold(`  ${stack.framework} ${stack.frameworkVersion}`) +
+        chalk.dim(
+          ` — ${stack.packageManager} — lockfile: ${stack.lockfileParsed ? 'parsed' : 'not found'}`,
+        ),
+    );
     console.log('');
 
-    const deprecated = outdated.filter(d => d.deprecated);
-    const outdatedOnly = outdated.filter(d => !d.deprecated);
+    const deprecated = outdated.filter((d) => d.deprecated);
+    const outdatedOnly = outdated.filter((d) => !d.deprecated);
 
     if (deprecated.length > 0) {
       console.log(chalk.bold.red(`  ⚠ Deprecated / Abandoned (${deprecated.length})`));
@@ -184,9 +199,15 @@ async function runAudit(projectPath: string, options: { json?: boolean; markdown
       console.log(chalk.bold.yellow(`  ⚡ Peer Dependency Conflicts (${peerConflicts.length})`));
       for (const c of peerConflicts) {
         const status = c.unresolvable ? chalk.red('UNRESOLVABLE') : chalk.yellow('CONFLICT');
-        console.log(`  ${chalk.yellow('●')} ${chalk.bold(c.package)} ${chalk.dim(c.installedVersion)}`);
-        console.log(`    Required: ${chalk.cyan(c.requiredRange)} by ${chalk.bold(c.requiredBy)} [${status}]`);
-        console.log(`    ${chalk.dim('confidence: high | source: lockfile, evidence: semver constraint check')}`);
+        console.log(
+          `  ${chalk.yellow('●')} ${chalk.bold(c.package)} ${chalk.dim(c.installedVersion)}`,
+        );
+        console.log(
+          `    Required: ${chalk.cyan(c.requiredRange)} by ${chalk.bold(c.requiredBy)} [${status}]`,
+        );
+        console.log(
+          `    ${chalk.dim('confidence: high | source: lockfile, evidence: semver constraint check')}`,
+        );
         console.log('');
       }
     }
@@ -196,9 +217,12 @@ async function runAudit(projectPath: string, options: { json?: boolean; markdown
       for (const d of outdatedOnly.slice(0, 15)) {
         const riskFn = RISK_COLOR[d.risk];
         const latest = d.latest === 'unknown' ? chalk.dim('unknown') : chalk.cyan(d.latest);
-        console.log(`  ${riskFn('●')} ${chalk.bold(d.name.padEnd(42))} ${chalk.dim(d.current)} → ${latest} ${chalk.dim(`[${d.risk}]`)}`);
+        console.log(
+          `  ${riskFn('●')} ${chalk.bold(d.name.padEnd(42))} ${chalk.dim(d.current)} → ${latest} ${chalk.dim(`[${d.risk}]`)}`,
+        );
       }
-      if (outdatedOnly.length > 15) console.log(`  ${chalk.dim(`… and ${outdatedOnly.length - 15} more`)}`);
+      if (outdatedOnly.length > 15)
+        console.log(`  ${chalk.dim(`… and ${outdatedOnly.length - 15} more`)}`);
       console.log('');
     }
 
@@ -206,7 +230,11 @@ async function runAudit(projectPath: string, options: { json?: boolean; markdown
       console.log(chalk.green('  ✔ No issues found. Project looks clean.\n'));
     }
 
-    console.log(chalk.dim(`  Run ${chalk.white('stack-lift migrate <path>')} for interactive guided migration.`));
+    console.log(
+      chalk.dim(
+        `  Run ${chalk.white('stack-lift migrate <path>')} for interactive guided migration.`,
+      ),
+    );
     console.log('');
 
     // Write artifacts if requested
@@ -252,13 +280,20 @@ program
 
 program
   .command('audit <path>')
-  .description('Read-only findings: deprecated packages, peer conflicts, outdated deps — with evidence and confidence scores')
+  .description(
+    'Read-only findings: deprecated packages, peer conflicts, outdated deps — with evidence and confidence scores',
+  )
   .option('--json', 'Write findings.json to output dir')
   .option('--markdown', 'Write markdown report to output dir')
   .option('--out-dir <dir>', 'Directory for artifact files', './stacklift-output')
-  .action(async (projectPath: string, options: { json?: boolean; markdown?: boolean; outDir?: string }) => {
-    await runAudit(projectPath, options);
-  });
+  .action(
+    async (
+      projectPath: string,
+      options: { json?: boolean; markdown?: boolean; outDir?: string },
+    ) => {
+      await runAudit(projectPath, options);
+    },
+  );
 
 // ── analyze (kept for backwards-compat) ─────────────────────────────────────
 
@@ -266,7 +301,9 @@ program
   .command('analyze <path>')
   .description('Alias for audit — analyze a project and show what needs upgrading')
   .action(async (projectPath: string) => {
-    console.warn(chalk.yellow('  ⚠  stack-lift analyze is deprecated. Use stack-lift audit instead.'));
+    console.warn(
+      chalk.yellow('  ⚠  stack-lift analyze is deprecated. Use stack-lift audit instead.'),
+    );
     const spinner = ora('Analyzing project…').start();
     try {
       const stack = detectStack(path.resolve(projectPath));
@@ -331,12 +368,18 @@ program
       projectPath: string,
       options: { to?: string; output: string; outDir: string; apply: boolean; dryRun: boolean },
     ) => {
-      console.warn(chalk.yellow('  ⚠  stack-lift upgrade is deprecated. Use stack-lift migrate instead.'));
+      console.warn(
+        chalk.yellow('  ⚠  stack-lift upgrade is deprecated. Use stack-lift migrate instead.'),
+      );
       const spinner = ora('Running upgrade analysis…').start();
       try {
         const resolved = path.resolve(projectPath);
-        const requestedFormats = options.output.split(',').map(f => f.trim()) as Array<'terminal' | 'markdown' | 'json'>;
-        const fileFormats = requestedFormats.filter(f => f === 'markdown' || f === 'json') as ArtifactFormat[];
+        const requestedFormats = options.output.split(',').map((f) => f.trim()) as Array<
+          'terminal' | 'markdown' | 'json'
+        >;
+        const fileFormats = requestedFormats.filter(
+          (f) => f === 'markdown' || f === 'json',
+        ) as ArtifactFormat[];
         const toTerminal = requestedFormats.includes('terminal');
 
         const primaryFileFormat = fileFormats[0];
@@ -360,7 +403,9 @@ program
           const artifacts = writeArtifacts(result.report, outDir, fileFormats);
           const machineArtifacts = writeMachineArtifacts(result.report, outDir);
           for (const a of [...artifacts, ...machineArtifacts]) {
-            console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} report written to: ${a.filePath}`));
+            console.log(
+              chalk.green(`  ✔ ${a.format.toUpperCase()} report written to: ${a.filePath}`),
+            );
           }
           console.log('');
         }
@@ -389,77 +434,100 @@ program
   .command('plan <path>')
   .description('Generate a deterministic upgrade plan — works in CI with --non-interactive')
   .option('-t, --to <version>', 'Target major version')
-  .option('--objective <objective>', 'Migration objective (minimal-risk|security|modernization|performance|full-migration)', 'minimal-risk')
+  .option(
+    '--objective <objective>',
+    'Migration objective (minimal-risk|security|modernization|performance|full-migration)',
+    'minimal-risk',
+  )
   .option('--non-interactive', 'Skip prompts and generate plan with provided options', false)
   .option('--markdown', 'Write markdown report to output dir', false)
   .option('--json', 'Write JSON artifacts to output dir', false)
   .option('--out-dir <dir>', 'Directory for artifact files', './stacklift-output')
-  .action(async (projectPath: string, options: { to?: string; objective: string; nonInteractive: boolean; markdown: boolean; json: boolean; outDir: string }) => {
-    try {
-      const stack = detectStack(path.resolve(projectPath));
-      const plan = planUpgrade(stack, options.to);
-      const riskFn = RISK_COLOR[plan.riskLevel];
+  .action(
+    async (
+      projectPath: string,
+      options: {
+        to?: string;
+        objective: string;
+        nonInteractive: boolean;
+        markdown: boolean;
+        json: boolean;
+        outDir: string;
+      },
+    ) => {
+      try {
+        const stack = detectStack(path.resolve(projectPath));
+        const plan = planUpgrade(stack, options.to);
+        const riskFn = RISK_COLOR[plan.riskLevel];
 
-      console.log('');
-      console.log(
-        chalk.bold(`  ${plan.framework} upgrade plan: v${plan.fromVersion} → v${plan.toVersion}`),
-      );
-      console.log(
-        `  Strategy: ${plan.strategy}  |  Risk: ${riskFn(plan.riskLevel)}  |  Effort: ${plan.estimatedEffort}`,
-      );
-      console.log(`  ${chalk.dim('Effort basis:')} ${chalk.dim(plan.effortBasis)}`);
-      console.log('');
-
-      for (const [i, step] of plan.steps.entries()) {
+        console.log('');
         console.log(
-          `  ${chalk.cyan(`${i + 1}.`)} v${step.fromVersion} → v${step.toVersion}  ${chalk.dim(step.description)}`,
+          chalk.bold(`  ${plan.framework} upgrade plan: v${plan.fromVersion} → v${plan.toVersion}`),
         );
         console.log(
-          `     ${step.breakingChanges.length} breaking changes, ${step.automatedFixes} auto-fixable`,
+          `  Strategy: ${plan.strategy}  |  Risk: ${riskFn(plan.riskLevel)}  |  Effort: ${plan.estimatedEffort}`,
         );
-        if (step.referenceUrl) {
-          console.log(`     ${chalk.dim(step.referenceUrl)}`);
-        }
-      }
-      console.log('');
+        console.log(`  ${chalk.dim('Effort basis:')} ${chalk.dim(plan.effortBasis)}`);
+        console.log('');
 
-      if (options.json || options.markdown) {
-        const { outdated, peerConflicts } = await analyzeDependencies(stack);
-        const report: UpgradeReport = {
-          stack,
-          plan,
-          outdatedDependencies: outdated,
-          peerConflicts,
-          refactorResults: [],
-          manualActions: [...new Set(plan.steps.flatMap(s => s.manualActions))],
-          buildStatus: 'skipped',
-          generatedAt: new Date().toISOString(),
-        };
-        const formats: ArtifactFormat[] = [];
-        if (options.markdown) formats.push('markdown');
-        if (options.json) formats.push('json');
-        const outDir = path.resolve(path.resolve(projectPath), options.outDir);
-        const artifacts = writeArtifacts(report, outDir, formats);
-        const machineArtifacts = writeMachineArtifacts(report, outDir);
-        for (const a of [...artifacts, ...machineArtifacts]) {
-          console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
+        for (const [i, step] of plan.steps.entries()) {
+          console.log(
+            `  ${chalk.cyan(`${i + 1}.`)} v${step.fromVersion} → v${step.toVersion}  ${chalk.dim(step.description)}`,
+          );
+          console.log(
+            `     ${step.breakingChanges.length} breaking changes, ${step.automatedFixes} auto-fixable`,
+          );
+          if (step.referenceUrl) {
+            console.log(`     ${chalk.dim(step.referenceUrl)}`);
+          }
         }
         console.log('');
+
+        if (options.json || options.markdown) {
+          const { outdated, peerConflicts } = await analyzeDependencies(stack);
+          const report: UpgradeReport = {
+            stack,
+            plan,
+            outdatedDependencies: outdated,
+            peerConflicts,
+            refactorResults: [],
+            manualActions: [...new Set(plan.steps.flatMap((s) => s.manualActions))],
+            buildStatus: 'skipped',
+            generatedAt: new Date().toISOString(),
+          };
+          const formats: ArtifactFormat[] = [];
+          if (options.markdown) formats.push('markdown');
+          if (options.json) formats.push('json');
+          const outDir = path.resolve(path.resolve(projectPath), options.outDir);
+          const artifacts = writeArtifacts(report, outDir, formats);
+          const machineArtifacts = writeMachineArtifacts(report, outDir);
+          for (const a of [...artifacts, ...machineArtifacts]) {
+            console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
+          }
+          console.log('');
+        }
+      } catch (err) {
+        console.error(chalk.red(String(err)));
+        process.exitCode = 1;
       }
-    } catch (err) {
-      console.error(chalk.red(String(err)));
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 // ── migrate ──────────────────────────────────────────────────────────────────
 
 program
   .command('migrate <path>')
   .description('Interactive guided migration — asks your intent, shows choices, writes artifacts')
-  .option('-n, --non-interactive', 'Skip all prompts and use provided flags (suitable for CI)', false)
+  .option(
+    '-n, --non-interactive',
+    'Skip all prompts and use provided flags (suitable for CI)',
+    false,
+  )
   .option('-t, --target <version>', 'Target major version for non-interactive mode')
-  .option('-o, --objective <objective>', 'Migration objective (minimal-risk|security|modernization|performance|full-migration)')
+  .option(
+    '-o, --objective <objective>',
+    'Migration objective (minimal-risk|security|modernization|performance|full-migration)',
+  )
   .option('-y, --yes', 'Auto-approve all prompts', false)
   .option('--dry-run', 'Show what would be done without writing files or creating backups', false)
   .option('--apply', 'Apply automated AST code fixes', false)
@@ -467,47 +535,54 @@ program
   .option('--json', 'Include JSON in output artifacts', false)
   .option('--markdown', 'Include Markdown in output artifacts (default: on)', false)
   .option('--out-dir <dir>', 'Output directory for artifacts', './stacklift-output')
-  .action(async (projectPath: string, options: {
-    nonInteractive: boolean;
-    target?: string;
-    objective?: string;
-    yes: boolean;
-    dryRun: boolean;
-    apply: boolean;
-    validate: boolean;
-    json: boolean;
-    markdown: boolean;
-    outDir: string;
-  }) => {
-    try {
-      const formats: ArtifactFormat[] = [];
-      if (options.markdown || (!options.json && !options.markdown)) formats.push('markdown');
-      if (options.json) formats.push('json');
+  .action(
+    async (
+      projectPath: string,
+      options: {
+        nonInteractive: boolean;
+        target?: string;
+        objective?: string;
+        yes: boolean;
+        dryRun: boolean;
+        apply: boolean;
+        validate: boolean;
+        json: boolean;
+        markdown: boolean;
+        outDir: string;
+      },
+    ) => {
+      try {
+        const formats: ArtifactFormat[] = [];
+        if (options.markdown || (!options.json && !options.markdown)) formats.push('markdown');
+        if (options.json) formats.push('json');
 
-      await runInteractive(projectPath, {
-        nonInteractive: options.nonInteractive || options.yes,
-        apply: options.apply,
-        validate: options.validate,
-        options: {
-          ...(options.target !== undefined ? { target: options.target } : {}),
-          ...(options.objective !== undefined ? { objective: options.objective as MigrationObjective } : {}),
-          yes: options.yes,
-          dryRun: options.dryRun,
-          outputFormats: formats,
-          outputDir: options.outDir,
+        await runInteractive(projectPath, {
+          nonInteractive: options.nonInteractive || options.yes,
+          apply: options.apply,
           validate: options.validate,
-        },
-      });
-    } catch (err) {
-      const msg = String(err);
-      if (msg.includes('User force closed')) {
-        console.log(chalk.dim('\n  Aborted.\n'));
-      } else {
-        console.error(chalk.red(msg));
-        process.exitCode = 1;
+          options: {
+            ...(options.target !== undefined ? { target: options.target } : {}),
+            ...(options.objective !== undefined
+              ? { objective: options.objective as MigrationObjective }
+              : {}),
+            yes: options.yes,
+            dryRun: options.dryRun,
+            outputFormats: formats,
+            outputDir: options.outDir,
+            validate: options.validate,
+          },
+        });
+      } catch (err) {
+        const msg = String(err);
+        if (msg.includes('User force closed')) {
+          console.log(chalk.dim('\n  Aborted.\n'));
+        } else {
+          console.error(chalk.red(msg));
+          process.exitCode = 1;
+        }
       }
-    }
-  });
+    },
+  );
 
 // ── apply ─────────────────────────────────────────────────────────────────────
 
@@ -517,55 +592,57 @@ program
   .option('-t, --to <version>', 'Target major version')
   .option('--validate', 'Run build validation after applying fixes', true)
   .option('--out-dir <dir>', 'Output directory for artifacts', './stacklift-output')
-  .action(async (projectPath: string, options: { to?: string; validate: boolean; outDir: string }) => {
-    const spinner = ora('Running upgrade analysis with auto-fix…').start();
-    try {
-      const resolved = path.resolve(projectPath);
-      const result = await runUpgrade({
-        projectPath: resolved,
-        ...(options.to !== undefined ? { targetVersion: options.to } : {}),
-        apply: true,
-        outputFormat: 'terminal',
-      });
-      spinner.succeed('Analysis and automated fixes complete');
-
-      printTerminalReport(result.report);
-
-      if (options.validate) {
-        const stack = result.report.stack;
-        const valSpinner = ora('Running build validation…').start();
-        const buildResults = validateBuild({
+  .action(
+    async (projectPath: string, options: { to?: string; validate: boolean; outDir: string }) => {
+      const spinner = ora('Running upgrade analysis with auto-fix…').start();
+      try {
+        const resolved = path.resolve(projectPath);
+        const result = await runUpgrade({
           projectPath: resolved,
-          packageManager: stack.packageManager,
-          steps: ['install', 'build', 'test', 'lint'],
+          ...(options.to !== undefined ? { targetVersion: options.to } : {}),
+          apply: true,
+          outputFormat: 'terminal',
         });
-        result.report.buildValidation = buildResults;
+        spinner.succeed('Analysis and automated fixes complete');
 
-        const failed = buildResults.filter(r => r.status === 'failed');
-        if (failed.length > 0) {
-          valSpinner.warn(`Build validation: ${failed.length} step(s) failed`);
-          for (const r of failed) {
-            console.log(chalk.red(`  ✗ ${r.step}: ${(r.error ?? '').split('\n')[0]}`));
+        printTerminalReport(result.report);
+
+        if (options.validate) {
+          const stack = result.report.stack;
+          const valSpinner = ora('Running build validation…').start();
+          const buildResults = validateBuild({
+            projectPath: resolved,
+            packageManager: stack.packageManager,
+            steps: ['install', 'build', 'test', 'lint'],
+          });
+          result.report.buildValidation = buildResults;
+
+          const failed = buildResults.filter((r) => r.status === 'failed');
+          if (failed.length > 0) {
+            valSpinner.warn(`Build validation: ${failed.length} step(s) failed`);
+            for (const r of failed) {
+              console.log(chalk.red(`  ✗ ${r.step}: ${(r.error ?? '').split('\n')[0]}`));
+            }
+          } else {
+            valSpinner.succeed('Build validation passed');
           }
-        } else {
-          valSpinner.succeed('Build validation passed');
+          console.log('');
+        }
+
+        // Write all artifacts
+        const outDir = path.resolve(resolved, options.outDir);
+        const artifacts = writeArtifacts(result.report, outDir, ['markdown', 'json']);
+        const machineArtifacts = writeMachineArtifacts(result.report, outDir);
+        for (const a of [...artifacts, ...machineArtifacts]) {
+          console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
         }
         console.log('');
+      } catch (err) {
+        spinner.fail(String(err));
+        process.exitCode = 1;
       }
-
-      // Write all artifacts
-      const outDir = path.resolve(resolved, options.outDir);
-      const artifacts = writeArtifacts(result.report, outDir, ['markdown', 'json']);
-      const machineArtifacts = writeMachineArtifacts(result.report, outDir);
-      for (const a of [...artifacts, ...machineArtifacts]) {
-        console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
-      }
-      console.log('');
-    } catch (err) {
-      spinner.fail(String(err));
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 // ── resume ───────────────────────────────────────────────────────────────────
 
@@ -577,7 +654,9 @@ program
     const session = readSession(resolved);
     if (!session) {
       console.log(chalk.yellow(`  No saved session found at ${resolved}/.stacklift/session.json`));
-      console.log(chalk.dim(`  Run ${chalk.white('stack-lift migrate <path>')} to start a new session.`));
+      console.log(
+        chalk.dim(`  Run ${chalk.white('stack-lift migrate <path>')} to start a new session.`),
+      );
       console.log('');
       return;
     }
@@ -591,8 +670,10 @@ program
     console.log(`  ${chalk.dim('Phase')}         ${session.phase}`);
     console.log(`  ${chalk.dim('Last updated')} ${session.lastUpdatedAt}`);
     console.log(`  ${chalk.dim('Created')}      ${session.createdAt}`);
-    if (session.decisions.objective) console.log(`  ${chalk.dim('Objective')}    ${session.decisions.objective}`);
-    if (session.decisions.targetVersion) console.log(`  ${chalk.dim('Target')}       ${session.decisions.targetVersion}`);
+    if (session.decisions.objective)
+      console.log(`  ${chalk.dim('Objective')}    ${session.decisions.objective}`);
+    if (session.decisions.targetVersion)
+      console.log(`  ${chalk.dim('Target')}       ${session.decisions.targetVersion}`);
     console.log('');
 
     if (session.phase === 'done') {

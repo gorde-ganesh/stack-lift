@@ -9,7 +9,13 @@ import { planUpgrade } from './upgrade-planner.js';
 import { analyzeBreakingChanges } from './breaking-change-analyzer.js';
 import { applyRefactors } from './refactor-engine.js';
 import { writeArtifacts, writeMachineArtifacts } from './artifact-writer.js';
-import { readSession, updateSession, clearSession, computeFingerprint, isFingerprintStale } from './session.js';
+import {
+  readSession,
+  updateSession,
+  clearSession,
+  computeFingerprint,
+  isFingerprintStale,
+} from './session.js';
 import { getReplacementEntry } from '../knowledge/replacements.js';
 import { ANGULAR_SUPPORTED_VERSIONS, getAngularLatestVersion } from '../knowledge/angular.js';
 import { REACT_SUPPORTED_VERSIONS, getReactLatestVersion } from '../knowledge/react.js';
@@ -45,7 +51,11 @@ function countOccurrences(projectPath: string, packageName: string): number {
 
   function walk(dir: string) {
     let entries: fs.Dirent<string>[];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true, encoding: 'utf8' }); } catch { return; }
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true, encoding: 'utf8' });
+    } catch {
+      return;
+    }
     for (const e of entries) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
@@ -53,9 +63,13 @@ function countOccurrences(projectPath: string, packageName: string): number {
       } else if (SOURCE_EXTS.has(path.extname(e.name))) {
         try {
           const content = fs.readFileSync(full, 'utf-8');
-          const matches = content.match(new RegExp(packageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'));
+          const matches = content.match(
+            new RegExp(packageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+          );
           if (matches) count += matches.length;
-        } catch { /* skip unreadable files */ }
+        } catch {
+          /* skip unreadable files */
+        }
       }
     }
   }
@@ -64,12 +78,16 @@ function countOccurrences(projectPath: string, packageName: string): number {
   return count;
 }
 
-function versionTargets(stack: StackInfo): Array<{ version: string; label: string; effort: string; recommended: boolean }> {
+function versionTargets(
+  stack: StackInfo,
+): Array<{ version: string; label: string; effort: string; recommended: boolean }> {
   const from = parseInt(stack.frameworkVersion.split('.')[0] ?? '0', 10);
-  const latest = stack.framework === 'Angular'
-    ? parseInt(getAngularLatestVersion(), 10)
-    : parseInt(getReactLatestVersion(), 10);
-  const supported = stack.framework === 'Angular' ? ANGULAR_SUPPORTED_VERSIONS : REACT_SUPPORTED_VERSIONS;
+  const latest =
+    stack.framework === 'Angular'
+      ? parseInt(getAngularLatestVersion(), 10)
+      : parseInt(getReactLatestVersion(), 10);
+  const supported =
+    stack.framework === 'Angular' ? ANGULAR_SUPPORTED_VERSIONS : REACT_SUPPORTED_VERSIONS;
 
   const targets: ReturnType<typeof versionTargets> = [];
 
@@ -84,8 +102,17 @@ function versionTargets(stack: StackInfo): Array<{ version: string; label: strin
     else effort = `higher effort — ${hops} hops`;
 
     const recommended = v === latest;
-    const tag = recommended ? chalk.green(' (recommended stable)') : v > latest ? chalk.yellow(' (latest)') : '';
-    targets.push({ version: ver, label: `${stack.framework} ${ver}${tag} — ${effort}`, effort, recommended });
+    const tag = recommended
+      ? chalk.green(' (recommended stable)')
+      : v > latest
+        ? chalk.yellow(' (latest)')
+        : '';
+    targets.push({
+      version: ver,
+      label: `${stack.framework} ${ver}${tag} — ${effort}`,
+      effort,
+      recommended,
+    });
   }
 
   return targets;
@@ -95,14 +122,22 @@ function versionTargets(stack: StackInfo): Array<{ version: string; label: strin
 
 function printDiscovery(stack: StackInfo) {
   phaseHeader('Phase 1 — Discovery');
-  console.log(`  ${chalk.dim('Framework     ')} ${chalk.cyan(`${stack.framework} ${stack.frameworkVersion}`)}`);
-  if (stack.typescript) console.log(`  ${chalk.dim('TypeScript    ')} ${stack.typescript}${stack.tsconfig?.strict ? chalk.green(' (strict mode on)') : chalk.yellow(' (strict mode off)')}`);
-  if (stack.rxjs)       console.log(`  ${chalk.dim('RxJS          ')} ${stack.rxjs}`);
+  console.log(
+    `  ${chalk.dim('Framework     ')} ${chalk.cyan(`${stack.framework} ${stack.frameworkVersion}`)}`,
+  );
+  if (stack.typescript)
+    console.log(
+      `  ${chalk.dim('TypeScript    ')} ${stack.typescript}${stack.tsconfig?.strict ? chalk.green(' (strict mode on)') : chalk.yellow(' (strict mode off)')}`,
+    );
+  if (stack.rxjs) console.log(`  ${chalk.dim('RxJS          ')} ${stack.rxjs}`);
   console.log(`  ${chalk.dim('Build tool    ')} ${stack.buildTool}`);
   console.log(`  ${chalk.dim('Pkg manager   ')} ${stack.packageManager}`);
   if (stack.nodeVersion) console.log(`  ${chalk.dim('Node          ')} ${stack.nodeVersion}`);
-  console.log(`  ${chalk.dim('Lockfile      ')} ${stack.lockfileParsed ? chalk.green('parsed (exact versions)') : chalk.yellow('not found (using declared ranges)')}`);
-  if (stack.isMonorepo) console.log(`  ${chalk.yellow('⚠  Monorepo detected')} — root + workspace deps will be shown`);
+  console.log(
+    `  ${chalk.dim('Lockfile      ')} ${stack.lockfileParsed ? chalk.green('parsed (exact versions)') : chalk.yellow('not found (using declared ranges)')}`,
+  );
+  if (stack.isMonorepo)
+    console.log(`  ${chalk.yellow('⚠  Monorepo detected')} — root + workspace deps will be shown`);
   console.log('');
 }
 
@@ -112,11 +147,23 @@ async function askObjective(): Promise<MigrationObjective> {
   return select<MigrationObjective>({
     message: 'Migration objective?',
     choices: [
-      { name: 'Minimal risk — just make the build pass, touch as little as possible', value: 'minimal-risk' },
-      { name: 'Security cleanup — remove vulnerable and deprecated packages first', value: 'security' },
-      { name: 'Modernization — best practices, standalone components, strict types', value: 'modernization' },
+      {
+        name: 'Minimal risk — just make the build pass, touch as little as possible',
+        value: 'minimal-risk',
+      },
+      {
+        name: 'Security cleanup — remove vulnerable and deprecated packages first',
+        value: 'security',
+      },
+      {
+        name: 'Modernization — best practices, standalone components, strict types',
+        value: 'modernization',
+      },
       { name: 'Performance — move to Vite/esbuild, reduce bundle size', value: 'performance' },
-      { name: 'Full migration — do everything: framework, deps, tooling, patterns', value: 'full-migration' },
+      {
+        name: 'Full migration — do everything: framework, deps, tooling, patterns',
+        value: 'full-migration',
+      },
     ],
   });
 }
@@ -124,19 +171,27 @@ async function askObjective(): Promise<MigrationObjective> {
 async function askTargetVersion(stack: StackInfo, objective: MigrationObjective): Promise<string> {
   const targets = versionTargets(stack);
   if (targets.length === 0) {
-    console.log(chalk.green(`  ✔ ${stack.framework} ${stack.frameworkVersion} is already the latest supported version.`));
+    console.log(
+      chalk.green(
+        `  ✔ ${stack.framework} ${stack.frameworkVersion} is already the latest supported version.`,
+      ),
+    );
     return stack.frameworkVersion.split('.')[0] ?? stack.frameworkVersion;
   }
 
   // Pre-select based on objective
-  let defaultIdx = targets.findIndex(t => t.recommended);
+  let defaultIdx = targets.findIndex((t) => t.recommended);
   if (objective === 'minimal-risk') {
     defaultIdx = 0; // next hop only
   }
 
   return select<string>({
     message: `Target ${stack.framework} version?`,
-    choices: targets.map((t, i) => ({ name: t.label, value: t.version, ...(i === defaultIdx ? {} : {}) })),
+    choices: targets.map((t, i) => ({
+      name: t.label,
+      value: t.version,
+      ...(i === defaultIdx ? {} : {}),
+    })),
     default: targets[defaultIdx]?.version,
   });
 }
@@ -146,7 +201,9 @@ async function askTargetVersion(stack: StackInfo, objective: MigrationObjective)
 async function runAnalysis(stack: StackInfo) {
   const spinner = ora('Querying npm registry and analyzing dependencies…').start();
   const result = await analyzeDependencies(stack);
-  spinner.succeed(`Found ${result.outdated.length} outdated package(s), ${result.peerConflicts.length} peer conflict(s)`);
+  spinner.succeed(
+    `Found ${result.outdated.length} outdated package(s), ${result.peerConflicts.length} peer conflict(s)`,
+  );
   return result;
 }
 
@@ -165,9 +222,10 @@ async function askPackageReplacements(
     if (!entry) continue;
 
     const occurrences = countOccurrences(stack.projectPath, pkg);
-    const effortStr = occurrences === 0
-      ? chalk.dim('(not found in source — may be transitive)')
-      : chalk.yellow(`found in ${occurrences} location(s)`);
+    const effortStr =
+      occurrences === 0
+        ? chalk.dim('(not found in source — may be transitive)')
+        : chalk.yellow(`found in ${occurrences} location(s)`);
 
     console.log('');
     console.log(`  ${chalk.bold.red('⚠')} ${chalk.bold(pkg)} — ${entry.reason}`);
@@ -178,7 +236,9 @@ async function askPackageReplacements(
       // In non-interactive mode: use pre-supplied choice, or pick first alternative, or skip
       const preChosen = autoChoices?.[pkg];
       const chosen = preChosen ?? entry.alternatives[0]?.name ?? null;
-      console.log(`  ${chalk.dim('→')} ${chalk.dim('non-interactive:')} ${chosen ? chalk.cyan(chosen) : chalk.dim('skipped')}`);
+      console.log(
+        `  ${chalk.dim('→')} ${chalk.dim('non-interactive:')} ${chosen ? chalk.cyan(chosen) : chalk.dim('skipped')}`,
+      );
       replacements.push({ package: pkg, chosen: chosen ?? null, occurrences });
       continue;
     }
@@ -189,7 +249,7 @@ async function askPackageReplacements(
       for (const q of entry.contextQuestions) {
         const answer = await select<string>({
           message: q.question,
-          choices: q.choices.map(c => ({ name: c.label, value: c.value })),
+          choices: q.choices.map((c) => ({ name: c.label, value: c.value })),
         });
 
         // Apply reorder rules per package
@@ -197,8 +257,8 @@ async function askPackageReplacements(
           if (answer === 'yes') {
             // Promote luxon first
             orderedAlternatives = [
-              ...orderedAlternatives.filter(a => a.name === 'luxon'),
-              ...orderedAlternatives.filter(a => a.name !== 'luxon'),
+              ...orderedAlternatives.filter((a) => a.name === 'luxon'),
+              ...orderedAlternatives.filter((a) => a.name !== 'luxon'),
             ];
           } else {
             // Promote dayjs first (already default, no change needed)
@@ -209,16 +269,16 @@ async function askPackageReplacements(
           } else {
             // Promote jest first for non-Angular
             orderedAlternatives = [
-              ...orderedAlternatives.filter(a => a.name === 'jest'),
-              ...orderedAlternatives.filter(a => a.name !== 'jest'),
+              ...orderedAlternatives.filter((a) => a.name === 'jest'),
+              ...orderedAlternatives.filter((a) => a.name !== 'jest'),
             ];
           }
         } else if (pkg === 'react-scripts' && q.id === 'react-scripts-ssr') {
           if (answer === 'yes') {
             // Promote next.js first
             orderedAlternatives = [
-              ...orderedAlternatives.filter(a => a.name === 'next.js'),
-              ...orderedAlternatives.filter(a => a.name !== 'next.js'),
+              ...orderedAlternatives.filter((a) => a.name === 'next.js'),
+              ...orderedAlternatives.filter((a) => a.name !== 'next.js'),
             ];
           }
           // else vite stays first (already default)
@@ -227,15 +287,21 @@ async function askPackageReplacements(
     }
 
     const choices = [
-      ...orderedAlternatives.map(alt => ({
+      ...orderedAlternatives.map((alt) => ({
         name: [
           chalk.bold(alt.name),
           chalk.dim(`—`),
           alt.description,
-          alt.apiSimilarity === 'high' ? chalk.green('[API similar]') : alt.apiSimilarity === 'medium' ? chalk.yellow('[some changes]') : chalk.red('[new API]'),
+          alt.apiSimilarity === 'high'
+            ? chalk.green('[API similar]')
+            : alt.apiSimilarity === 'medium'
+              ? chalk.yellow('[some changes]')
+              : chalk.red('[new API]'),
           chalk.dim(`effort: ${alt.migrationEffort}`),
           alt.bundleNote ? chalk.cyan(`[${alt.bundleNote}]`) : '',
-        ].filter(Boolean).join(' '),
+        ]
+          .filter(Boolean)
+          .join(' '),
         value: alt.name,
         description: alt.notes ?? '',
       })),
@@ -269,7 +335,10 @@ async function askBackupStrategy(nonInteractive: boolean, yes: boolean): Promise
   });
 }
 
-async function askOutputFormats(nonInteractive: boolean, preselected?: ArtifactFormat[]): Promise<ArtifactFormat[]> {
+async function askOutputFormats(
+  nonInteractive: boolean,
+  preselected?: ArtifactFormat[],
+): Promise<ArtifactFormat[]> {
   if (nonInteractive) return preselected ?? ['markdown', 'json'];
   return checkbox<ArtifactFormat>({
     message: 'Generate artifacts',
@@ -292,7 +361,9 @@ async function askOutputDir(nonInteractive: boolean, defaultDir?: string): Promi
 
 function isGitDirty(projectPath: string): boolean {
   try {
-    const output = execSync('git status --porcelain', { cwd: projectPath, stdio: 'pipe' }).toString().trim();
+    const output = execSync('git status --porcelain', { cwd: projectPath, stdio: 'pipe' })
+      .toString()
+      .trim();
     return output.length > 0;
   } catch {
     return false;
@@ -317,7 +388,11 @@ function applyBackup(projectPath: string, strategy: BackupStrategy): void {
 
 // ── Checklist printer ─────────────────────────────────────────────────────────
 
-function printChecklist(report: UpgradeReport, replacements: PackageReplacement[], artifacts: Array<{ format: string; filePath: string }>) {
+function printChecklist(
+  report: UpgradeReport,
+  replacements: PackageReplacement[],
+  artifacts: Array<{ format: string; filePath: string }>,
+) {
   phaseHeader('Migration Checklist');
 
   for (const { format, filePath } of artifacts) {
@@ -327,7 +402,9 @@ function printChecklist(report: UpgradeReport, replacements: PackageReplacement[
 
   console.log(chalk.bold('  Framework upgrade steps:'));
   for (const [i, step] of report.plan.steps.entries()) {
-    console.log(`  ${chalk.cyan(`${i + 1}.`)} ${step.fromVersion} → ${step.toVersion}  ${chalk.dim(step.description)}`);
+    console.log(
+      `  ${chalk.cyan(`${i + 1}.`)} ${step.fromVersion} → ${step.toVersion}  ${chalk.dim(step.description)}`,
+    );
     for (const action of step.manualActions) {
       console.log(`     ${chalk.yellow('□')} ${action}`);
     }
@@ -337,16 +414,18 @@ function printChecklist(report: UpgradeReport, replacements: PackageReplacement[
   }
   console.log('');
 
-  const chosen = replacements.filter(r => r.chosen !== null);
+  const chosen = replacements.filter((r) => r.chosen !== null);
   if (chosen.length > 0) {
     console.log(chalk.bold('  Package replacements to apply:'));
     for (const r of chosen) {
-      console.log(`  ${chalk.yellow('□')} Replace ${chalk.bold(r.package)} → ${chalk.cyan(r.chosen ?? '')}  ${chalk.dim(`(${r.occurrences} occurrence(s) in source)`)}`);
+      console.log(
+        `  ${chalk.yellow('□')} Replace ${chalk.bold(r.package)} → ${chalk.cyan(r.chosen ?? '')}  ${chalk.dim(`(${r.occurrences} occurrence(s) in source)`)}`,
+      );
     }
     console.log('');
   }
 
-  const skipped = replacements.filter(r => r.chosen === null);
+  const skipped = replacements.filter((r) => r.chosen === null);
   if (skipped.length > 0) {
     console.log(chalk.bold('  Deferred (skipped) packages:'));
     for (const r of skipped) {
@@ -356,19 +435,27 @@ function printChecklist(report: UpgradeReport, replacements: PackageReplacement[
   }
 
   console.log(chalk.bold('  Code issues found in source:'));
-  const allSuggestions = report.refactorResults.flatMap(r => r.suggestions);
+  const allSuggestions = report.refactorResults.flatMap((r) => r.suggestions);
   if (allSuggestions.length === 0) {
     console.log(`  ${chalk.green('✔')} No code issues detected.\n`);
   } else {
-    console.log(`  ${chalk.yellow(String(allSuggestions.length))} location(s) require attention — see the report for details.\n`);
+    console.log(
+      `  ${chalk.yellow(String(allSuggestions.length))} location(s) require attention — see the report for details.\n`,
+    );
   }
 
   // Build validation summary
   if (report.buildValidation && report.buildValidation.length > 0) {
     console.log(chalk.bold('  Build validation:'));
     for (const r of report.buildValidation) {
-      const icon = r.status === 'success' ? chalk.green('✔') : r.status === 'failed' ? chalk.red('✗') : chalk.dim('○');
-      const dur = r.durationMs !== undefined ? chalk.dim(` (${Math.round(r.durationMs / 1000)}s)`) : '';
+      const icon =
+        r.status === 'success'
+          ? chalk.green('✔')
+          : r.status === 'failed'
+            ? chalk.red('✗')
+            : chalk.dim('○');
+      const dur =
+        r.durationMs !== undefined ? chalk.dim(` (${Math.round(r.durationMs / 1000)}s)`) : '';
       console.log(`  ${icon} ${r.step}${dur}`);
       if (r.status === 'failed' && r.error) {
         console.log(`    ${chalk.red(r.error.split('\n')[0] ?? r.error)}`);
@@ -378,7 +465,9 @@ function printChecklist(report: UpgradeReport, replacements: PackageReplacement[
   }
 
   console.log(chalk.bold('  After each hop, run:'));
-  console.log(`  ${chalk.dim('$')} ${report.stack.packageManager === 'yarn' ? 'yarn build && yarn test' : report.stack.packageManager === 'pnpm' ? 'pnpm build && pnpm test' : 'npm run build && npm test'}`);
+  console.log(
+    `  ${chalk.dim('$')} ${report.stack.packageManager === 'yarn' ? 'yarn build && yarn test' : report.stack.packageManager === 'pnpm' ? 'pnpm build && pnpm test' : 'npm run build && npm test'}`,
+  );
   console.log('');
 }
 
@@ -432,7 +521,11 @@ export async function runInteractive(
       if (stale) {
         console.log('');
         console.log(chalk.yellow('  ⚠ Project changed since session creation.'));
-        console.log(chalk.dim('  Resuming may produce invalid analysis (package.json, lockfile, or git HEAD changed).'));
+        console.log(
+          chalk.dim(
+            '  Resuming may produce invalid analysis (package.json, lockfile, or git HEAD changed).',
+          ),
+        );
         const resume = await confirm({
           message: 'Resume anyway?',
           default: false,
@@ -465,7 +558,9 @@ export async function runInteractive(
   try {
     const fp = computeFingerprint(resolved, `${stack.framework} ${stack.frameworkVersion}`);
     updateSession(resolved, { fingerprint: fp });
-  } catch { /* non-fatal — fingerprint is best-effort */ }
+  } catch {
+    /* non-fatal — fingerprint is best-effort */
+  }
 
   if (!ni) {
     const shouldContinue = await confirm({ message: 'Continue with this project?', default: true });
@@ -477,20 +572,19 @@ export async function runInteractive(
 
   // ── Phase 2: Intent ────────────────────────────────────────────────────────
   phaseHeader('Phase 2 — Intent');
-  const objective = ni
-    ? (niOpts.objective ?? 'minimal-risk')
-    : await askObjective();
+  const objective = ni ? (niOpts.objective ?? 'minimal-risk') : await askObjective();
 
   if (ni) {
     console.log(`  ${chalk.dim('Objective')}  ${chalk.cyan(objective)}`);
   }
 
-  const targetVersion = ni && niOpts.target
-    ? niOpts.target
-    : await askTargetVersion(stack, objective);
+  const targetVersion =
+    ni && niOpts.target ? niOpts.target : await askTargetVersion(stack, objective);
 
   if (ni) {
-    console.log(`  ${chalk.dim('Target   ')}  ${chalk.cyan(`${stack.framework} ${targetVersion}`)}`);
+    console.log(
+      `  ${chalk.dim('Target   ')}  ${chalk.cyan(`${stack.framework} ${targetVersion}`)}`,
+    );
   }
 
   updateSession(resolved, { phase: 'decisions', decisions: { objective, targetVersion } });
@@ -502,38 +596,52 @@ export async function runInteractive(
   // Show peer conflicts if any
   if (peerConflicts.length > 0) {
     console.log('');
-    console.log(chalk.bold(`  ${chalk.red('!')} Peer dependency conflicts (${peerConflicts.length}):`));
+    console.log(
+      chalk.bold(`  ${chalk.red('!')} Peer dependency conflicts (${peerConflicts.length}):`),
+    );
     for (const c of peerConflicts) {
-      console.log(`  ${chalk.red('●')} ${chalk.bold(c.package)} ${chalk.dim(c.installedVersion)} does not satisfy ${chalk.cyan(c.requiredRange)} required by ${chalk.bold(c.requiredBy)}`);
+      console.log(
+        `  ${chalk.red('●')} ${chalk.bold(c.package)} ${chalk.dim(c.installedVersion)} does not satisfy ${chalk.cyan(c.requiredRange)} required by ${chalk.bold(c.requiredBy)}`,
+      );
       if (c.unresolvable) {
-        console.log(`     ${chalk.red('Unresolvable')} — no published version satisfies both constraints`);
+        console.log(
+          `     ${chalk.red('Unresolvable')} — no published version satisfies both constraints`,
+        );
       }
     }
   }
 
-  const deprecated = outdated.filter(d => d.deprecated);
+  const deprecated = outdated.filter((d) => d.deprecated);
   if (deprecated.length > 0) {
     console.log('');
     console.log(chalk.bold(`  Deprecated packages found (${deprecated.length}):`));
     for (const d of deprecated) {
-      console.log(`  ${chalk.red('●')} ${chalk.bold(d.name)} ${chalk.dim(d.current)} — ${d.reason ?? 'deprecated'} ${chalk.dim(`[confidence: ${d.confidence}]`)}`);
+      console.log(
+        `  ${chalk.red('●')} ${chalk.bold(d.name)} ${chalk.dim(d.current)} — ${d.reason ?? 'deprecated'} ${chalk.dim(`[confidence: ${d.confidence}]`)}`,
+      );
     }
   }
 
-  const outdatedOnly = outdated.filter(d => !d.deprecated);
+  const outdatedOnly = outdated.filter((d) => !d.deprecated);
   if (outdatedOnly.length > 0) {
     console.log('');
     console.log(chalk.bold(`  Outdated packages (${outdatedOnly.length}):`));
     for (const d of outdatedOnly.slice(0, 8)) {
       const latest = d.latest === 'unknown' ? chalk.dim('unknown') : chalk.cyan(d.latest);
-      console.log(`  ${chalk.yellow('●')} ${chalk.bold(d.name.padEnd(40))} ${chalk.dim(d.current)} → ${latest}`);
+      console.log(
+        `  ${chalk.yellow('●')} ${chalk.bold(d.name.padEnd(40))} ${chalk.dim(d.current)} → ${latest}`,
+      );
     }
-    if (outdatedOnly.length > 8) console.log(`  ${chalk.dim(`… and ${outdatedOnly.length - 8} more`)}`);
+    if (outdatedOnly.length > 8)
+      console.log(`  ${chalk.dim(`… and ${outdatedOnly.length - 8} more`)}`);
   }
 
   if (!ni) {
     console.log('');
-    const phase3ok = await confirm({ message: 'Analysis complete. Continue to decisions?', default: true });
+    const phase3ok = await confirm({
+      message: 'Analysis complete. Continue to decisions?',
+      default: true,
+    });
     if (!phase3ok) {
       console.log(chalk.dim('  Paused. Re-run to resume.\n'));
       process.exit(0);
@@ -543,13 +651,13 @@ export async function runInteractive(
   // ── Phase 4: Decisions ─────────────────────────────────────────────────────
   phaseHeader('Phase 4 — Decisions');
 
-  const deprecatedWithReplacements = deprecated.filter(d => getReplacementEntry(d.name));
+  const deprecatedWithReplacements = deprecated.filter((d) => getReplacementEntry(d.name));
   let packageReplacements: PackageReplacement[] = [];
   if (deprecatedWithReplacements.length > 0) {
     if (!ni) console.log('  For each deprecated package, choose a replacement or defer:\n');
     packageReplacements = await askPackageReplacements(
       stack,
-      deprecatedWithReplacements.map(d => d.name),
+      deprecatedWithReplacements.map((d) => d.name),
       ni,
     );
   }
@@ -582,10 +690,14 @@ export async function runInteractive(
     console.log(`  ${chalk.bold('Target')}     ${stack.framework} ${targetVersion}`);
     console.log(`  ${chalk.bold('Backup')}     ${backupStrategy}`);
     console.log(`  ${chalk.bold('Output')}     ${outputFormats.join(', ')} → ${outputDir}`);
-    const chosen = packageReplacements.filter(r => r.chosen !== null);
-    const skipped = packageReplacements.filter(r => r.chosen === null);
-    if (chosen.length > 0) console.log(`  ${chalk.bold('Replace')}    ${chosen.map(r => `${r.package} → ${r.chosen}`).join(', ')}`);
-    if (skipped.length > 0) console.log(`  ${chalk.bold('Defer')}      ${skipped.map(r => r.package).join(', ')}`);
+    const chosen = packageReplacements.filter((r) => r.chosen !== null);
+    const skipped = packageReplacements.filter((r) => r.chosen === null);
+    if (chosen.length > 0)
+      console.log(
+        `  ${chalk.bold('Replace')}    ${chosen.map((r) => `${r.package} → ${r.chosen}`).join(', ')}`,
+      );
+    if (skipped.length > 0)
+      console.log(`  ${chalk.bold('Defer')}      ${skipped.map((r) => r.package).join(', ')}`);
     divider();
     console.log('');
 
@@ -608,9 +720,11 @@ export async function runInteractive(
         ...(stack.lockfileParsed !== undefined ? { lockfileParsed: stack.lockfileParsed } : {}),
         steps: ['install', 'build', 'test', 'lint'],
       });
-      const baseFailed = baselineValidation.filter(r => r.status === 'failed');
+      const baseFailed = baselineValidation.filter((r) => r.status === 'failed');
       if (baseFailed.length > 0) {
-        baseSpinner.warn(`Baseline: ${baseFailed.length} pre-existing failure(s) — will be noted in report`);
+        baseSpinner.warn(
+          `Baseline: ${baseFailed.length} pre-existing failure(s) — will be noted in report`,
+        );
       } else {
         baseSpinner.succeed('Baseline build validation passed');
       }
@@ -624,7 +738,11 @@ export async function runInteractive(
     if (!ni && isGitDirty(resolved)) {
       console.log('');
       console.log(chalk.yellow('  ⚠ Working tree has uncommitted changes.'));
-      console.log(chalk.dim('  Creating a backup on a dirty tree will mix upgrade changes with your current work,'));
+      console.log(
+        chalk.dim(
+          '  Creating a backup on a dirty tree will mix upgrade changes with your current work,',
+        ),
+      );
       console.log(chalk.dim('  making code review and rollback harder.'));
       const proceed = await confirm({
         message: 'Stash or commit your changes first is recommended. Proceed anyway?',
@@ -642,17 +760,26 @@ export async function runInteractive(
   // Initial plan without size hint — re-plan after scanning to calibrate effort
   const planSpinner = ora('Building upgrade plan…').start();
   const initialPlan = planUpgrade(stack, targetVersion);
-  planSpinner.succeed(`Plan: ${initialPlan.steps.length} hop(s) — scanning source for size calibration…`);
+  planSpinner.succeed(
+    `Plan: ${initialPlan.steps.length} hop(s) — scanning source for size calibration…`,
+  );
 
   const codeSpinner = ora('Scanning source files for breaking-change patterns…').start();
   const codeSuggestions = analyzeBreakingChanges(resolved, initialPlan);
   codeSpinner.succeed(`Found ${codeSuggestions.length} code location(s) to review`);
 
-  const affectedFiles = new Set(codeSuggestions.map(s => s.file)).size;
-  const plan = planUpgrade(stack, targetVersion, { affectedFiles, totalOccurrences: codeSuggestions.length });
+  const affectedFiles = new Set(codeSuggestions.map((s) => s.file)).size;
+  const plan = planUpgrade(stack, targetVersion, {
+    affectedFiles,
+    totalOccurrences: codeSuggestions.length,
+  });
 
-  const planSpinner2 = ora(`Effort calibrated: ${plan.estimatedEffort} (${affectedFiles} file(s), ${codeSuggestions.length} location(s))`).start();
-  planSpinner2.succeed(`Plan ready: ${plan.steps.length} step(s), ${plan.riskLevel} risk, effort ${plan.estimatedEffort}`);
+  const planSpinner2 = ora(
+    `Effort calibrated: ${plan.estimatedEffort} (${affectedFiles} file(s), ${codeSuggestions.length} location(s))`,
+  ).start();
+  planSpinner2.succeed(
+    `Plan ready: ${plan.steps.length} step(s), ${plan.riskLevel} risk, effort ${plan.estimatedEffort}`,
+  );
 
   const byFile = new Map<string, typeof codeSuggestions>();
   for (const s of codeSuggestions) {
@@ -660,7 +787,10 @@ export async function runInteractive(
     list.push(s);
     byFile.set(s.file, list);
   }
-  let refactorResults = Array.from(byFile.entries()).map(([file, suggestions]) => ({ file, suggestions }));
+  let refactorResults = Array.from(byFile.entries()).map(([file, suggestions]) => ({
+    file,
+    suggestions,
+  }));
 
   // Apply automated fixes if requested
   if (interactiveOpts.apply) {
@@ -671,7 +801,7 @@ export async function runInteractive(
     }
   }
 
-  const manualActions = [...new Set(plan.steps.flatMap(s => s.manualActions))];
+  const manualActions = [...new Set(plan.steps.flatMap((s) => s.manualActions))];
 
   const report: UpgradeReport = {
     stack,
@@ -696,7 +826,7 @@ export async function runInteractive(
         ...(stack.lockfileParsed !== undefined ? { lockfileParsed: stack.lockfileParsed } : {}),
         steps: ['install', 'build', 'test', 'lint'],
       });
-      const failed = report.buildValidation.filter(r => r.status === 'failed');
+      const failed = report.buildValidation.filter((r) => r.status === 'failed');
       if (failed.length > 0) {
         valSpinner.warn(`Build validation: ${failed.length} step(s) failed`);
         report.buildStatus = 'failed';
@@ -724,11 +854,15 @@ export async function runInteractive(
 
   // ── Auto-fix notice ────────────────────────────────────────────────────────
   if (!interactiveOpts.apply) {
-    const autoFixable = codeSuggestions.filter(s => s.change.automated);
+    const autoFixable = codeSuggestions.filter((s) => s.change.automated);
     if (autoFixable.length > 0) {
       console.log('');
-      console.log(chalk.bold(`  ${chalk.green(String(autoFixable.length))} location(s) can be auto-fixed.`));
-      console.log(chalk.dim(`  Re-run with ${chalk.white('stack-lift apply <path>')} to apply them.`));
+      console.log(
+        chalk.bold(`  ${chalk.green(String(autoFixable.length))} location(s) can be auto-fixed.`),
+      );
+      console.log(
+        chalk.dim(`  Re-run with ${chalk.white('stack-lift apply <path>')} to apply them.`),
+      );
     }
   }
 

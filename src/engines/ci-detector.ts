@@ -77,9 +77,10 @@ function readFile(filePath: string): string | null {
 
 function collectWorkflowFiles(workflowsDir: string): string[] {
   try {
-    return fs.readdirSync(workflowsDir)
-      .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'))
-      .map(f => path.join(workflowsDir, f));
+    return fs
+      .readdirSync(workflowsDir)
+      .filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'))
+      .map((f) => path.join(workflowsDir, f));
   } catch {
     return [];
   }
@@ -131,7 +132,7 @@ export function detectCiNodeVersions(
     }
   }
 
-  const hasConflict = nodeVersionFindings.some(f => !f.meetsMinimum);
+  const hasConflict = nodeVersionFindings.some((f) => !f.meetsMinimum);
 
   return { configsFound, nodeVersionFindings, hasConflict };
 }

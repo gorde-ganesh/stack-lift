@@ -1,7 +1,13 @@
 import semver from 'semver';
 import { execSync } from 'node:child_process';
 import { getPackageInfoBatch } from './npm-registry.js';
-import type { StackInfo, DependencyInfo, PeerDepConflict, RiskLevel, PackageManager } from '../types/index.js';
+import type {
+  StackInfo,
+  DependencyInfo,
+  PeerDepConflict,
+  RiskLevel,
+  PackageManager,
+} from '../types/index.js';
 
 function stripRange(version: string): string {
   return (version.replace(/^[\^~>=<*]+/, '').split(' ')[0] ?? '').split('-')[0] ?? '';
@@ -133,8 +139,7 @@ export async function analyzeDependencies(stack: StackInfo): Promise<DependencyA
       const installedEntry = allDeps.get(peer);
       if (!installedEntry) continue;
 
-      const installedVersion =
-        stack.resolvedVersions?.[peer] ?? stripRange(installedEntry.version);
+      const installedVersion = stack.resolvedVersions?.[peer] ?? stripRange(installedEntry.version);
       const coerced = semver.coerce(installedVersion);
       if (!coerced) continue;
 
@@ -168,10 +173,14 @@ interface AuditVulnerability {
 
 function auditCommand(packageManager: PackageManager): string {
   switch (packageManager) {
-    case 'pnpm': return 'pnpm audit --json';
-    case 'yarn': return 'yarn audit --json';
-    case 'bun': return 'bun audit';
-    default: return 'npm audit --json';
+    case 'pnpm':
+      return 'pnpm audit --json';
+    case 'yarn':
+      return 'yarn audit --json';
+    case 'bun':
+      return 'bun audit';
+    default:
+      return 'npm audit --json';
   }
 }
 
@@ -233,9 +242,18 @@ export function runSecurityAudit(
 // ── Transitive conflict detection ─────────────────────────────────────────────
 
 const FRAMEWORK_ECOSYSTEM_PACKAGES = new Set([
-  '@angular/core', '@angular/common', '@angular/forms', '@angular/router',
-  '@angular/platform-browser', '@angular/cdk', '@angular/material',
-  'rxjs', 'zone.js', 'react', 'react-dom', 'react-router-dom',
+  '@angular/core',
+  '@angular/common',
+  '@angular/forms',
+  '@angular/router',
+  '@angular/platform-browser',
+  '@angular/cdk',
+  '@angular/material',
+  'rxjs',
+  'zone.js',
+  'react',
+  'react-dom',
+  'react-router-dom',
 ]);
 
 export interface TransitiveConflict {
@@ -252,7 +270,8 @@ export async function detectTransitiveConflicts(
 ): Promise<TransitiveConflict[]> {
   const allDeps = new Map<string, string>();
   for (const [name, ver] of Object.entries(stack.rawDependencies)) allDeps.set(name, ver);
-  for (const [name, ver] of Object.entries(stack.rawDevDependencies)) if (!allDeps.has(name)) allDeps.set(name, ver);
+  for (const [name, ver] of Object.entries(stack.rawDevDependencies))
+    if (!allDeps.has(name)) allDeps.set(name, ver);
 
   const packageNames = Array.from(allDeps.keys());
   const registryData = await getPackageInfoBatch(packageNames);
@@ -268,7 +287,8 @@ export async function detectTransitiveConflicts(
       const installedEntry = allDeps.get(peer);
       if (!installedEntry) continue;
 
-      const installedVersion = stack.resolvedVersions?.[peer] ?? installedEntry.replace(/^[\^~>=<*]+/, '');
+      const installedVersion =
+        stack.resolvedVersions?.[peer] ?? installedEntry.replace(/^[\^~>=<*]+/, '');
       const coerced = semver.coerce(installedVersion);
       if (!coerced) continue;
 
@@ -276,7 +296,9 @@ export async function detectTransitiveConflicts(
       const targetCoerced = semver.coerce(targetFrameworkVersion);
       if (!targetCoerced) continue;
 
-      const satisfiesTarget = semver.satisfies(targetCoerced, requiredRange, { includePrerelease: false });
+      const satisfiesTarget = semver.satisfies(targetCoerced, requiredRange, {
+        includePrerelease: false,
+      });
       if (!satisfiesTarget) {
         conflicts.push({
           transitivePackage: pkgName,

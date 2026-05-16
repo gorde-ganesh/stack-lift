@@ -35,14 +35,17 @@ function estimateEffort(
   const manualCount = steps.flatMap((s) => s.manualActions).length;
 
   const filePart = affectedFileCount !== undefined ? `, ${affectedFileCount} affected file(s)` : '';
-  const occPart = totalOccurrences !== undefined ? `, ${totalOccurrences} occurrence(s) in source` : '';
+  const occPart =
+    totalOccurrences !== undefined ? `, ${totalOccurrences} occurrence(s) in source` : '';
   const basis = `${totalChanges} catalogued breaking changes, ${manualCount} manual actions across ${steps.length} hop(s)${filePart}${occPart} — does not account for test coverage or CI complexity`;
 
   // Scale effort up if codebase is large (many affected files or occurrences)
   const sizeMultiplier =
-    (affectedFileCount ?? 0) > 100 || (totalOccurrences ?? 0) > 200 ? 2
-    : (affectedFileCount ?? 0) > 30 || (totalOccurrences ?? 0) > 50 ? 1.5
-    : 1;
+    (affectedFileCount ?? 0) > 100 || (totalOccurrences ?? 0) > 200
+      ? 2
+      : (affectedFileCount ?? 0) > 30 || (totalOccurrences ?? 0) > 50
+        ? 1.5
+        : 1;
 
   const baseScore = totalChanges + manualCount * 0.5;
   const scaledScore = baseScore * sizeMultiplier;
@@ -113,7 +116,11 @@ export function planUpgrade(
   const strategy = steps.length > 1 ? 'incremental' : 'direct';
   const totalBreakingChanges = steps.reduce((n, s) => n + s.breakingChanges.length, 0);
   const totalAutomatedFixes = steps.reduce((n, s) => n + s.automatedFixes, 0);
-  const { effort, basis } = estimateEffort(steps, sizeHint?.affectedFiles, sizeHint?.totalOccurrences);
+  const { effort, basis } = estimateEffort(
+    steps,
+    sizeHint?.affectedFiles,
+    sizeHint?.totalOccurrences,
+  );
 
   return {
     framework,

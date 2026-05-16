@@ -200,18 +200,23 @@ function detectUnsafeLifecycles(source: SourceFile): TransformResult[] {
   ];
   const found = patterns.filter((p) => text.includes(p));
   if (found.length === 0) return [];
-  return [{
-    description: `Legacy unsafe React lifecycle detected (${found.join(', ')}). Manual migration required. See react.dev/blog/2018/03/27/update-on-async-rendering.html`,
-  }];
+  return [
+    {
+      description: `Legacy unsafe React lifecycle detected (${found.join(', ')}). Manual migration required. See react.dev/blog/2018/03/27/update-on-async-rendering.html`,
+    },
+  ];
 }
 
 function detectContextConsumer(source: SourceFile): TransformResult[] {
   const text = source.getFullText();
   // Match JSX <Something.Consumer> patterns
   if (!/<[A-Za-z_$][A-Za-z0-9_$]*\.Consumer[\s>]/.test(text)) return [];
-  return [{
-    description: 'Context.Consumer render-prop pattern detected. Consider migrating to useContext().',
-  }];
+  return [
+    {
+      description:
+        'Context.Consumer render-prop pattern detected. Consider migrating to useContext().',
+    },
+  ];
 }
 
 function detectStringRefs(source: SourceFile): TransformResult[] {
@@ -219,9 +224,12 @@ function detectStringRefs(source: SourceFile): TransformResult[] {
   const hasStringRefAttr = /ref=["'][^"']+["']/.test(text);
   const hasThisRefs = /this\.refs\./.test(text);
   if (!hasStringRefAttr && !hasThisRefs) return [];
-  return [{
-    description: 'Legacy string ref detected. Manual migration to useRef() or createRef() recommended.',
-  }];
+  return [
+    {
+      description:
+        'Legacy string ref detected. Manual migration to useRef() or createRef() recommended.',
+    },
+  ];
 }
 
 // ── Transform dispatch ───────────────────────────────────────────────────────

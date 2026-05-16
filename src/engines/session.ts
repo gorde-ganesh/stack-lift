@@ -51,10 +51,7 @@ export function computeFingerprint(
   projectPath: string,
   frameworkVersion: string,
 ): SessionFingerprint {
-  const packageJsonContent = fs.readFileSync(
-    path.join(projectPath, 'package.json'),
-    'utf-8',
-  );
+  const packageJsonContent = fs.readFileSync(path.join(projectPath, 'package.json'), 'utf-8');
   const packageJsonHash = sha256(packageJsonContent);
 
   const lockfiles = ['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb'];
@@ -97,10 +94,7 @@ export function newSession(projectPath: string): SessionState {
   };
 }
 
-export function updateSession(
-  projectPath: string,
-  patch: Partial<SessionState>,
-): SessionState {
+export function updateSession(projectPath: string, patch: Partial<SessionState>): SessionState {
   const existing = readSession(projectPath) ?? newSession(projectPath);
   const updated: SessionState = {
     ...existing,

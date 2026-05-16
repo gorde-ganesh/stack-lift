@@ -227,7 +227,13 @@ export async function resolveCompatibleVersion(
       }
 
       // Check if our target major satisfies the peer range
-      const rangeMin = parseInt((peerRange.match(/>=\s*(\d+)/) ?? peerRange.match(/\^(\d+)/) ?? peerRange.match(/~(\d+)/) ?? [])[1] ?? '0', 10);
+      const rangeMin = parseInt(
+        (peerRange.match(/>=\s*(\d+)/) ??
+          peerRange.match(/\^(\d+)/) ??
+          peerRange.match(/~(\d+)/) ??
+          [])[1] ?? '0',
+        10,
+      );
       const rangeMax = parseInt((peerRange.match(/<\s*(\d+)/) ?? [])[1] ?? '999', 10);
 
       if (targetMajor >= rangeMin && targetMajor < rangeMax) {

@@ -3,18 +3,45 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { BuildValidationResult, PackageManager } from '../types/index.js';
 
-const PM_CMDS: Record<PackageManager, { install: string; installImmutable: string; build: string; test: string; lint: string }> = {
-  npm:  { install: 'npm install',      installImmutable: 'npm ci',                          build: 'npm run build',  test: 'npm test',       lint: 'npm run lint' },
-  yarn: { install: 'yarn install',     installImmutable: 'yarn install --immutable',         build: 'yarn build',     test: 'yarn test',      lint: 'yarn lint' },
-  pnpm: { install: 'pnpm install',     installImmutable: 'pnpm install --frozen-lockfile',   build: 'pnpm build',     test: 'pnpm test',      lint: 'pnpm lint' },
-  bun:  { install: 'bun install',      installImmutable: 'bun install',                      build: 'bun run build',  test: 'bun test',       lint: 'bun run lint' },
+const PM_CMDS: Record<
+  PackageManager,
+  { install: string; installImmutable: string; build: string; test: string; lint: string }
+> = {
+  npm: {
+    install: 'npm install',
+    installImmutable: 'npm ci',
+    build: 'npm run build',
+    test: 'npm test',
+    lint: 'npm run lint',
+  },
+  yarn: {
+    install: 'yarn install',
+    installImmutable: 'yarn install --immutable',
+    build: 'yarn build',
+    test: 'yarn test',
+    lint: 'yarn lint',
+  },
+  pnpm: {
+    install: 'pnpm install',
+    installImmutable: 'pnpm install --frozen-lockfile',
+    build: 'pnpm build',
+    test: 'pnpm test',
+    lint: 'pnpm lint',
+  },
+  bun: {
+    install: 'bun install',
+    installImmutable: 'bun install',
+    build: 'bun run build',
+    test: 'bun test',
+    lint: 'bun run lint',
+  },
 };
 
 function hasScript(projectPath: string, name: string): boolean {
   try {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(projectPath, 'package.json'), 'utf-8'),
-    ) as { scripts?: Record<string, string> };
+    const pkg = JSON.parse(fs.readFileSync(path.join(projectPath, 'package.json'), 'utf-8')) as {
+      scripts?: Record<string, string>;
+    };
     return Boolean(pkg.scripts?.[name]);
   } catch {
     return false;
@@ -33,7 +60,12 @@ function runStep(
       stdio: 'pipe',
       timeout: 5 * 60 * 1000,
     }).toString();
-    return { step, status: 'success', durationMs: Date.now() - start, output: output.slice(0, 2000) };
+    return {
+      step,
+      status: 'success',
+      durationMs: Date.now() - start,
+      output: output.slice(0, 2000),
+    };
   } catch (err: unknown) {
     const e = err as { stdout?: Buffer; stderr?: Buffer; message?: string };
     const combined = [e.stdout?.toString(), e.stderr?.toString()].filter(Boolean).join('\n');
@@ -62,7 +94,12 @@ export interface ValidateOptions {
  * to avoid mutating the dependency graph during validation.
  */
 export function validateBuild(options: ValidateOptions): BuildValidationResult[] {
-  const { projectPath, packageManager, lockfileParsed = false, steps = ['install', 'build', 'test', 'lint'] } = options;
+  const {
+    projectPath,
+    packageManager,
+    lockfileParsed = false,
+    steps = ['install', 'build', 'test', 'lint'],
+  } = options;
   const cmds = PM_CMDS[packageManager];
   const results: BuildValidationResult[] = [];
 

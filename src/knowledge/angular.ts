@@ -59,7 +59,10 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'typescript@~4.2.0',
     ],
     conditionalNpmInstall: [
-      { packages: ['@angular/material@12', '@angular/cdk@12'], condition: '@angular/material detected' },
+      {
+        packages: ['@angular/material@12', '@angular/cdk@12'],
+        condition: '@angular/material detected',
+      },
     ],
   },
 
@@ -141,7 +144,10 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'zone.js@~0.11.4',
     ],
     conditionalNpmInstall: [
-      { packages: ['@angular/material@13', '@angular/cdk@13'], condition: '@angular/material detected' },
+      {
+        packages: ['@angular/material@13', '@angular/cdk@13'],
+        condition: '@angular/material detected',
+      },
     ],
   },
 
@@ -191,7 +197,10 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'rxjs@~7.5.0',
     ],
     conditionalNpmInstall: [
-      { packages: ['@angular/material@14', '@angular/cdk@14'], condition: '@angular/material detected' },
+      {
+        packages: ['@angular/material@14', '@angular/cdk@14'],
+        condition: '@angular/material detected',
+      },
     ],
   },
 
@@ -251,7 +260,10 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'rxjs@~7.5.0',
     ],
     conditionalNpmInstall: [
-      { packages: ['@angular/material@15', '@angular/cdk@15'], condition: '@angular/material detected' },
+      {
+        packages: ['@angular/material@15', '@angular/cdk@15'],
+        condition: '@angular/material detected',
+      },
     ],
   },
 
@@ -302,7 +314,10 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'zone.js@~0.13.0',
     ],
     conditionalNpmInstall: [
-      { packages: ['@angular/material@16', '@angular/cdk@16'], condition: '@angular/material detected' },
+      {
+        packages: ['@angular/material@16', '@angular/cdk@16'],
+        condition: '@angular/material detected',
+      },
     ],
   },
 
@@ -377,7 +392,10 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'zone.js@~0.14.0',
     ],
     conditionalNpmInstall: [
-      { packages: ['@angular/material@17', '@angular/cdk@17'], condition: '@angular/material detected' },
+      {
+        packages: ['@angular/material@17', '@angular/cdk@17'],
+        condition: '@angular/material detected',
+      },
     ],
   },
 
@@ -423,7 +441,11 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'zone.js@~0.14.0',
     ],
     conditionalNpmInstall: [
-      { packages: ['@angular/material@18', '@angular/cdk@18'], condition: '@angular/material detected — Angular Material 18 includes stable Material 3 theme support' },
+      {
+        packages: ['@angular/material@18', '@angular/cdk@18'],
+        condition:
+          '@angular/material detected — Angular Material 18 includes stable Material 3 theme support',
+      },
     ],
   },
 
@@ -485,7 +507,10 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'zone.js@~0.15.0',
     ],
     conditionalNpmInstall: [
-      { packages: ['@angular/material@19', '@angular/cdk@19'], condition: '@angular/material detected' },
+      {
+        packages: ['@angular/material@19', '@angular/cdk@19'],
+        condition: '@angular/material detected',
+      },
     ],
   },
 
@@ -539,7 +564,10 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'zone.js@~0.15.0',
     ],
     conditionalNpmInstall: [
-      { packages: ['@angular/material@20', '@angular/cdk@20'], condition: '@angular/material detected' },
+      {
+        packages: ['@angular/material@20', '@angular/cdk@20'],
+        condition: '@angular/material detected',
+      },
     ],
   },
 };
@@ -563,5 +591,15 @@ export function getAngularLatestVersion(): string {
 }
 
 export const ANGULAR_SUPPORTED_VERSIONS = [
-  '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
+  '10',
+  '11',
+  '12',
+  '13',
+  '14',
+  '15',
+  '16',
+  '17',
+  '18',
+  '19',
+  '20',
 ];

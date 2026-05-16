@@ -64,7 +64,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
       },
       {
         name: 'webdriverio',
-        description: 'WebDriver-based — most similar to Protractor\'s model',
+        description: "WebDriver-based — most similar to Protractor's model",
         apiSimilarity: 'high',
         migrationEffort: 'low',
         notes: 'Easiest migration path from Protractor',
@@ -94,7 +94,8 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     alternatives: [
       {
         name: 'eslint + @typescript-eslint/eslint-plugin',
-        description: 'Official replacement; use tslint-to-eslint-config for automatic rule migration',
+        description:
+          'Official replacement; use tslint-to-eslint-config for automatic rule migration',
         apiSimilarity: 'medium',
         migrationEffort: 'medium',
         notes: 'Run: npx tslint-to-eslint-config to migrate rules',
@@ -186,7 +187,8 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
         description: 'Direct upgrade — Babel 7 is the current stable release',
         apiSimilarity: 'high',
         migrationEffort: 'medium',
-        notes: 'Also rename babel-preset-* and babel-plugin-* to @babel/preset-* and @babel/plugin-*',
+        notes:
+          'Also rename babel-preset-* and babel-plugin-* to @babel/preset-* and @babel/plugin-*',
       },
     ],
     skipOption: 'Keep babel-core temporarily',
@@ -194,7 +196,8 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
 
   '@angular/flex-layout': {
     deprecated: '@angular/flex-layout',
-    reason: '@angular/flex-layout is archived and no longer maintained. CSS Grid/Flexbox has native browser support.',
+    reason:
+      '@angular/flex-layout is archived and no longer maintained. CSS Grid/Flexbox has native browser support.',
     alternatives: [
       {
         name: 'CSS Grid + Flexbox (native)',
@@ -223,7 +226,8 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
 
   karma: {
     deprecated: 'karma',
-    reason: 'Karma has reached end-of-life (deprecated in 2023). Angular CLI migrated to Web Test Runner for new projects.',
+    reason:
+      'Karma has reached end-of-life (deprecated in 2023). Angular CLI migrated to Web Test Runner for new projects.',
     alternatives: [
       {
         name: '@web/test-runner',
@@ -262,7 +266,8 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
 
   'jasmine-core': {
     deprecated: 'jasmine-core',
-    reason: 'Jasmine/Karma stack is being phased out in Angular projects in favour of Web Test Runner + Jasmine or Jest.',
+    reason:
+      'Jasmine/Karma stack is being phased out in Angular projects in favour of Web Test Runner + Jasmine or Jest.',
     alternatives: [
       {
         name: 'jest',
@@ -284,7 +289,8 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
 
   lodash: {
     deprecated: 'lodash',
-    reason: 'Lodash is not deprecated but ships 70KB+ by default. Native JS and smaller alternatives now cover most use cases.',
+    reason:
+      'Lodash is not deprecated but ships 70KB+ by default. Native JS and smaller alternatives now cover most use cases.',
     alternatives: [
       {
         name: 'Native JS (Array/Object methods)',
@@ -315,11 +321,13 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
 
   jquery: {
     deprecated: 'jquery',
-    reason: 'jQuery is not deprecated, but in modern Angular/React/Vue projects it adds weight and conflicts with the framework\'s change detection.',
+    reason:
+      "jQuery is not deprecated, but in modern Angular/React/Vue projects it adds weight and conflicts with the framework's change detection.",
     alternatives: [
       {
         name: 'Native DOM APIs',
-        description: 'document.querySelector, fetch, classList — cover 90% of jQuery usage natively',
+        description:
+          'document.querySelector, fetch, classList — cover 90% of jQuery usage natively',
         apiSimilarity: 'low',
         migrationEffort: 'high',
         bundleNote: 'Zero bundle cost',
@@ -337,18 +345,21 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
 
   '@angular-material-components/datetime-picker': {
     deprecated: '@angular-material-components/datetime-picker',
-    reason: '@angular-material-components/datetime-picker is abandoned and incompatible with Angular 17+.',
+    reason:
+      '@angular-material-components/datetime-picker is abandoned and incompatible with Angular 17+.',
     alternatives: [
       {
         name: '@dhutaryan/ngx-mat-timepicker',
-        description: 'Actively maintained Angular Material time picker, compatible with Angular 17+',
+        description:
+          'Actively maintained Angular Material time picker, compatible with Angular 17+',
         apiSimilarity: 'high',
         migrationEffort: 'low',
         notes: 'Estimated changes: 3–5 component files',
       },
       {
         name: 'Angular Material Datepicker + manual time input',
-        description: 'Use built-in Angular Material datepicker with a native time <input type="time">',
+        description:
+          'Use built-in Angular Material datepicker with a native time <input type="time">',
         apiSimilarity: 'medium',
         migrationEffort: 'medium',
         notes: 'No third-party dependency required',
@@ -366,7 +377,8 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
 
   'rxjs-compat': {
     deprecated: 'rxjs-compat',
-    reason: 'rxjs-compat was a bridge for RxJS 5 → 6. RxJS 7+ has no compat layer — code must use pipeable operators.',
+    reason:
+      'rxjs-compat was a bridge for RxJS 5 → 6. RxJS 7+ has no compat layer — code must use pipeable operators.',
     alternatives: [
       {
         name: 'rxjs (pipeable operators)',
@@ -381,11 +393,13 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
 
   'zone.js': {
     deprecated: 'zone.js',
-    reason: 'zone.js is not deprecated but Angular 18 introduces experimental zoneless mode as a superior alternative for performance.',
+    reason:
+      'zone.js is not deprecated but Angular 18 introduces experimental zoneless mode as a superior alternative for performance.',
     alternatives: [
       {
         name: 'Angular zoneless (experimental)',
-        description: 'provideExperimentalZonelessChangeDetection() — better performance, simpler debugging',
+        description:
+          'provideExperimentalZonelessChangeDetection() — better performance, simpler debugging',
         apiSimilarity: 'low',
         migrationEffort: 'high',
         notes: 'Requires Angular 18+ and converting all components to signals or OnPush',
@@ -394,9 +408,10 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     skipOption: 'Keep zone.js (stable, recommended for most projects)',
   },
 
-  'classnames': {
+  classnames: {
     deprecated: 'classnames',
-    reason: 'classnames is maintained but clsx offers a smaller, faster, TypeScript-native alternative.',
+    reason:
+      'classnames is maintained but clsx offers a smaller, faster, TypeScript-native alternative.',
     alternatives: [
       {
         name: 'clsx',
@@ -412,14 +427,16 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
 
   'react-router': {
     deprecated: 'react-router',
-    reason: 'react-router v5 has significant breaking changes in v6 (removed <Switch>, <Redirect>, hook-based navigation).',
+    reason:
+      'react-router v5 has significant breaking changes in v6 (removed <Switch>, <Redirect>, hook-based navigation).',
     alternatives: [
       {
         name: 'react-router-dom@6',
         description: 'Current stable release — v6 API is cleaner and fully tree-shakeable',
         apiSimilarity: 'medium',
         migrationEffort: 'medium',
-        notes: 'Replace <Switch> with <Routes>, <Redirect> with <Navigate>, useHistory with useNavigate',
+        notes:
+          'Replace <Switch> with <Routes>, <Redirect> with <Navigate>, useHistory with useNavigate',
       },
       {
         name: 'react-router-dom@7',
@@ -438,7 +455,8 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     alternatives: [
       {
         name: 'react-router-dom@6',
-        description: 'Current stable release — v6 removes Switch, Redirect, and history prop patterns',
+        description:
+          'Current stable release — v6 removes Switch, Redirect, and history prop patterns',
         apiSimilarity: 'medium',
         migrationEffort: 'medium',
         notes: 'See reactrouter.com/en/v6/upgrading/v5 for official migration steps',
@@ -453,13 +471,15 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     skipOption: 'Keep react-router-dom v5 temporarily',
   },
 
-  'redux': {
+  redux: {
     deprecated: 'redux',
-    reason: 'redux alone requires significant boilerplate. Redux Toolkit (RTK) is the officially recommended way to write Redux logic.',
+    reason:
+      'redux alone requires significant boilerplate. Redux Toolkit (RTK) is the officially recommended way to write Redux logic.',
     alternatives: [
       {
         name: '@reduxjs/toolkit',
-        description: 'Official Redux wrapper — eliminates boilerplate with createSlice, createAsyncThunk',
+        description:
+          'Official Redux wrapper — eliminates boilerplate with createSlice, createAsyncThunk',
         apiSimilarity: 'high',
         migrationEffort: 'medium',
         notes: 'RTK Query can replace react-query/axios patterns for data fetching',

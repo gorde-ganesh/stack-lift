@@ -1,6 +1,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { StackInfo, Framework, BuildTool, PackageManager, TsconfigInfo } from '../types/index.js';
+import type {
+  StackInfo,
+  Framework,
+  BuildTool,
+  PackageManager,
+  TsconfigInfo,
+} from '../types/index.js';
 
 function readJsonFile(filePath: string): Record<string, unknown> | null {
   try {
@@ -90,10 +96,25 @@ function detectPackageManager(projectPath: string): PackageManager {
   return 'npm';
 }
 
-function detectTestRunner(projectPath: string, allDeps: Record<string, string>): string | undefined {
-  if (exists(path.join(projectPath, 'karma.conf.js')) || exists(path.join(projectPath, 'karma.conf.ts'))) return 'Karma';
-  if (exists(path.join(projectPath, 'jest.config.js')) || exists(path.join(projectPath, 'jest.config.ts'))) return 'Jest';
-  if (exists(path.join(projectPath, 'vitest.config.ts')) || exists(path.join(projectPath, 'vitest.config.js'))) return 'Vitest';
+function detectTestRunner(
+  projectPath: string,
+  allDeps: Record<string, string>,
+): string | undefined {
+  if (
+    exists(path.join(projectPath, 'karma.conf.js')) ||
+    exists(path.join(projectPath, 'karma.conf.ts'))
+  )
+    return 'Karma';
+  if (
+    exists(path.join(projectPath, 'jest.config.js')) ||
+    exists(path.join(projectPath, 'jest.config.ts'))
+  )
+    return 'Jest';
+  if (
+    exists(path.join(projectPath, 'vitest.config.ts')) ||
+    exists(path.join(projectPath, 'vitest.config.js'))
+  )
+    return 'Vitest';
   if (allDeps['@playwright/test']) return 'Playwright';
   if (allDeps['cypress']) return 'Cypress';
   if (allDeps['karma']) return 'Karma';
@@ -220,10 +241,14 @@ function readTsconfig(projectPath: string): TsconfigInfo | undefined {
       if (co['strict'] !== undefined) info.strict = co['strict'] as boolean;
       if (co['target'] !== undefined) info.target = co['target'] as string;
       if (co['module'] !== undefined) info.module = co['module'] as string;
-      if (co['moduleResolution'] !== undefined) info.moduleResolution = co['moduleResolution'] as string;
-      if (co['useDefineForClassFields'] !== undefined) info.useDefineForClassFields = co['useDefineForClassFields'] as boolean;
-      if (co['experimentalDecorators'] !== undefined) info.experimentalDecorators = co['experimentalDecorators'] as boolean;
-      if (co['emitDecoratorMetadata'] !== undefined) info.emitDecoratorMetadata = co['emitDecoratorMetadata'] as boolean;
+      if (co['moduleResolution'] !== undefined)
+        info.moduleResolution = co['moduleResolution'] as string;
+      if (co['useDefineForClassFields'] !== undefined)
+        info.useDefineForClassFields = co['useDefineForClassFields'] as boolean;
+      if (co['experimentalDecorators'] !== undefined)
+        info.experimentalDecorators = co['experimentalDecorators'] as boolean;
+      if (co['emitDecoratorMetadata'] !== undefined)
+        info.emitDecoratorMetadata = co['emitDecoratorMetadata'] as boolean;
       return info;
     } catch {
       return undefined;

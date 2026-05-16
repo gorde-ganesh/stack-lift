@@ -47,10 +47,7 @@ export function writeArtifacts(
  * Write the complete set of machine-readable artifacts: findings.json, plan.json.
  * Always written alongside the standard report artifacts.
  */
-export function writeMachineArtifacts(
-  report: UpgradeReport,
-  outputDir: string,
-): ArtifactResult[] {
+export function writeMachineArtifacts(report: UpgradeReport, outputDir: string): ArtifactResult[] {
   fs.mkdirSync(outputDir, { recursive: true });
 
   const results: ArtifactResult[] = [];
