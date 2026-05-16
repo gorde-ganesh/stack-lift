@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { writeArtifacts, writeMachineArtifacts } from '../packages/core/src/reporting/artifact-writer.js';
+import {
+  writeArtifacts,
+  writeMachineArtifacts,
+} from '../packages/core/src/reporting/artifact-writer.js';
 import { detectStack } from '../packages/core/src/detector/stack-detector.js';
 import { planUpgrade } from '../packages/core/src/planner/upgrade-planner.js';
 import { fileURLToPath } from 'node:url';
