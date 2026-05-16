@@ -70,6 +70,8 @@ Check tsconfig.json, angular.json, webpack→vite config, package.json engines.
 
 Write to `./stacklift-output/stacklift-report-{framework}-{from}-to-{to}.md` plus companion JSON files (`findings.json`, `plan.json`).
 
+**CLI apply note:** When the user runs `stack-lift apply`, the CLI executes `ng update` / `npm install` via the safe command executor: real-time streaming, 5-minute timeout, git stash backup before mutations, and automatic rollback on failure. Copilot/this skill does not run commands.
+
 ---
 
 ## Evidence Standards

@@ -107,6 +107,8 @@ Companion files: `stacklift-report-{slug}.json`, `findings.json`, `plan.json`.
 
 Print: `Report written to ./stacklift-output/stacklift-report-{slug}.md`
 
+**CLI apply note:** When the user runs `stack-lift apply`, the CLI executes `ng update` / `npm install` via the safe command executor: real-time streaming, 5-minute timeout, git stash backup before mutations, and automatic rollback on failure. Cursor/this skill does not run commands.
+
 ---
 
 ## Evidence Standards

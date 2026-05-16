@@ -34,6 +34,20 @@ export { analyzeBreakingChanges } from './planner/breaking-change-analyzer.js';
 
 // Execution
 export { applyRefactors, hasAutomatedFix, runDetectors } from './execution/refactor-engine.js';
+export {
+  runCommand,
+  createGitBackup,
+  restoreGitBackup,
+  executeCommands,
+} from './execution/command-runner.js';
+export type {
+  CommandOptions,
+  CommandResult,
+  BackupRef,
+  CommandExecution,
+  ExecuteCommandsOptions,
+  ExecuteCommandsResult,
+} from './execution/command-runner.js';
 
 // Validation
 export { validateBuild } from './validation/build-validator.js';

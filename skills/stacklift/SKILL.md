@@ -591,7 +591,14 @@ JSON output is available for programmatic consumption if the user requests it.
 
 ### AUTO-FIX: Safe to automate (AST transforms — applied by `stack-lift apply`)
 
-These patterns are implemented as AST transforms in the refactor engine. They can be applied automatically when the user says "apply" or uses `--apply`:
+These patterns are implemented as AST transforms in the refactor engine. They can be applied automatically when the user says "apply" or uses `--apply`.
+
+**Safe command executor** — when `stack-lift apply` runs `ng update` or `npm install` for a version hop, it uses the `executeCommands` engine (`command-runner.ts`) which:
+- Streams stdout/stderr in real time so progress is visible
+- Enforces a 5-minute timeout per command (kills hung processes — uses `taskkill /T /F` on Windows to kill the full process tree)
+- Creates a git stash backup (`git stash push --include-untracked`) before the first mutation
+- Automatically restores from that backup (`git stash pop` or `git reset --hard`) if any command fails or times out
+- Supports `--dry-run` to preview commands without executing them
 
 | API Key | Change |
 |---------|--------|
@@ -650,7 +657,7 @@ See `examples/` for worked migration requests:
 
 ## Limitations
 
-- **No runtime execution (skill mode)**: This AI skill reads and analyzes files. It does not run `npm install`, `ng build`, or test suites. Use `stack-lift apply --validate` in the CLI for build validation.
+- **No runtime execution (skill mode)**: This AI skill reads and analyzes files. It does not run `npm install`, `ng build`, or test suites. Use `stack-lift apply --validate` in the CLI for build validation. The CLI uses the safe command executor (`executeCommands`) which streams output, enforces a 5-minute timeout, and auto-rolls back via git stash on failure — the AI skill does none of this.
 - **Knowledge cutoff**: The static knowledge base has a fixed version. StackLift mitigates this by fetching live official migration guides via WebSearch/WebFetch during each run (see Citations in Evidence Standards). If live fetching is unavailable, the static catalogue is used and a fallback notice is included in the report.
 - **Angular 10 start**: The knowledge base has Angular upgrade steps from v11 onward. If the project is on Angular 10, detect it but note that the v10→v11 step is not catalogued — advise consulting the official Angular update guide manually before continuing.
 - **Private packages**: Cannot analyze packages not in the npm registry.

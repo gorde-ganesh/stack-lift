@@ -49,7 +49,7 @@ detector/           stack-detector, ci-detector
 planner/            upgrade-planner, breaking-change-analyzer
 dependency-intelligence/  dependency-analyzer, npm-registry
 orchestration/      orchestrator (pipeline entry point), session
-execution/          refactor-engine, build-validator, artifact-writer
+execution/          refactor-engine, command-runner, build-validator, artifact-writer
 reporting/          doc-generator
 providers/          framework-provider interface, registry, react-provider
 path-guard.ts       path traversal protection (called before any FS writes)
@@ -89,7 +89,8 @@ To add a new framework: implement `FrameworkProvider` in a new package, call `re
 
 - `path-guard.ts` (`assertSafePath`) must be called before any filesystem write; it blocks path traversal attempts.
 - Every finding must carry `confidence` (`high | medium | low`) and `latestSource` (`observed | inferred | registry`) so users can calibrate trust.
-- `planUpgrade` and `detectStack` are pure/synchronous; only `analyzeDependencies` and `applyRefactors` have side effects.
+- `planUpgrade` and `detectStack` are pure/synchronous; only `analyzeDependencies`, `applyRefactors`, and `executeCommands` have side effects.
+- `command-runner.ts` (`executeCommands`) must always create a git backup before mutating the project. It uses `git stash push --include-untracked` and restores via `git stash pop` (or `git reset --hard`) on failure. On Windows, process-tree kill uses `taskkill /T /F` because `child.kill()` only kills the `cmd.exe` shell wrapper.
 - Monorepos: `detectStack` flags `isMonorepo` but does not recurse. The CLI warns users to run per workspace.
 
 ### Tests and fixtures

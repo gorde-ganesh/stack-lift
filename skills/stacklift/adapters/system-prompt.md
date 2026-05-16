@@ -89,6 +89,8 @@ Write a structured report with: summary table, upgrade path, outdated deps, brea
 
 Report filename: `stacklift-report-{framework}-{fromVersion}-to-{toVersion}.md`
 
+**CLI apply note:** When the user runs `stack-lift apply`, the CLI executes `ng update` / `npm install` commands through the safe command executor (`executeCommands`): real-time streaming, 5-minute timeout per command, git stash backup before the first mutation, and automatic rollback on failure. The AI skill itself does not execute commands.
+
 ---
 
 ## Evidence Standards
