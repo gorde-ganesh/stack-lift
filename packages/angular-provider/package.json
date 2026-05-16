@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },

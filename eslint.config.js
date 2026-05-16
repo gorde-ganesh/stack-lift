@@ -1,17 +1,22 @@
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import prettier from 'eslint-config-prettier';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 export default [
   {
     ignores: ['dist/**', 'node_modules/**', '*.cjs', 'vitest.config.ts', 'tsup.config.ts'],
   },
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'packages/*/src/**/*.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        project: './tsconfig.json',
+        project: ['./tsconfig.json', './packages/*/tsconfig.json'],
+        tsconfigRootDir: rootDir,
         ecmaVersion: 2022,
         sourceType: 'module',
       },
