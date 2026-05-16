@@ -291,6 +291,22 @@ export interface UpgradeReport {
   /** Command execution journal populated when running in autonomous mode. */
   commandExecutions?: CommandExecutionRecord[];
   commandExecutionStatus?: 'success' | 'failed' | 'rolled-back' | 'dry-run';
+  /** Config file migrations detected and optionally applied. */
+  configMigrations?: ConfigMigrationResult[];
+}
+
+export interface ConfigMigrationResult {
+  id: string;
+  file: string;
+  description: string;
+  fromVersion: string;
+  toVersion: string;
+  needed: boolean;
+  applied: boolean;
+  dryRun: boolean;
+  before?: string;
+  after?: string;
+  diff?: string;
 }
 
 export interface AnalyzeOptions {

@@ -5,6 +5,7 @@ import { analyzeDependencies } from '../dependency-intelligence/dependency-analy
 import { planUpgrade } from '../planner/upgrade-planner.js';
 import { analyzeBreakingChanges } from '../planner/breaking-change-analyzer.js';
 import { applyRefactors } from '../execution/refactor-engine.js';
+import { analyzeConfigMigrations, applyConfigMigrations } from '../migration/config-migrator.js';
 import { generateMarkdownReport, generateJsonReport } from '../reporting/doc-generator.js';
 import { assertSafePath } from '../path-guard.js';
 import type { AnalyzeOptions, UpgradeReport, StackInfo, UpgradePlan } from '@stack-lift/shared';
@@ -40,6 +41,10 @@ export async function runUpgrade(options: AnalyzeOptions): Promise<OrchestratorR
     suggestions,
   }));
 
+  const configMigrations = apply
+    ? applyConfigMigrations(projectPath, plan, false)
+    : analyzeConfigMigrations(projectPath, plan);
+
   if (apply) {
     const applied = applyRefactors(codeSuggestions);
     if (applied.length > 0) refactorResults = applied;
@@ -56,6 +61,7 @@ export async function runUpgrade(options: AnalyzeOptions): Promise<OrchestratorR
     manualActions,
     buildStatus: 'skipped',
     generatedAt: new Date().toISOString(),
+    configMigrations,
   };
 
   const markdown = generateMarkdownReport(report);

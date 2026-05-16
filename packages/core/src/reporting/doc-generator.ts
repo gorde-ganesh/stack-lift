@@ -252,6 +252,33 @@ export function generateMarkdownReport(report: UpgradeReport): string {
     );
   }
 
+  if (report.configMigrations && report.configMigrations.length > 0) {
+    const needed = report.configMigrations.filter((m) => m.needed);
+    const applied = report.configMigrations.filter((m) => m.applied);
+    const rows = report.configMigrations.map((m) => {
+      const status = m.applied ? '✅ Applied' : m.needed ? '⚠️ Needed' : '✔️ Already done';
+      return `| \`${m.file}\` | v${m.fromVersion}→v${m.toVersion} | ${m.description} | ${status} |`;
+    });
+    const summary =
+      applied.length > 0
+        ? `${applied.length} applied`
+        : needed.length > 0
+          ? `${needed.length} needed — re-run with \`--apply\` to write`
+          : 'no changes needed';
+    sections.push(
+      [
+        '## Config Migrations',
+        '',
+        `> ${summary}`,
+        '',
+        '| File | Version hop | Change | Status |',
+        '|------|-------------|--------|--------|',
+        ...rows,
+        '',
+      ].join('\n'),
+    );
+  }
+
   if (manualActions.length > 0) {
     sections.push(
       [

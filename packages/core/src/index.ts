@@ -71,6 +71,12 @@ export { writeArtifacts, writeMachineArtifacts } from './reporting/artifact-writ
 // Path safety
 export { assertSafePath, resolveSafePath } from './path-guard.js';
 
+// Config migration
+export {
+  analyzeConfigMigrations,
+  applyConfigMigrations,
+} from './migration/config-migrator.js';
+
 // Provider API
 export type { FrameworkProvider } from './providers/framework-provider.js';
 export {
