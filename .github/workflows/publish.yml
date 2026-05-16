@@ -46,7 +46,8 @@ jobs:
       - name: Bump version
         env:
           BUMP: ${{ inputs.bump }}
-        run: npm version "$BUMP" -m "chore: release v%s"
+        run: |
+          npm version "$BUMP" -m "chore: release v%s"
 
       - name: Push commit and tag
         run: |
