@@ -22,7 +22,10 @@ module.exports = {
     // Prefer const assertions
     'prefer-const': 'error',
     // No unused vars (TypeScript version handles generics correctly)
-    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+    ],
     // No floating promises
     '@typescript-eslint/no-floating-promises': 'error',
     // Consistent type assertions

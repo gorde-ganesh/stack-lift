@@ -416,8 +416,8 @@ function buildFindingsList(report: UpgradeReport) {
     .sort((a, b) => {
       const typeOrder = (a['type'] as string).localeCompare(b['type'] as string);
       if (typeOrder !== 0) return typeOrder;
-      const aKey = ((a['package'] ?? a['file'] ?? '') as string);
-      const bKey = ((b['package'] ?? b['file'] ?? '') as string);
+      const aKey = (a['package'] ?? a['file'] ?? '') as string;
+      const bKey = (b['package'] ?? b['file'] ?? '') as string;
       return aKey.localeCompare(bKey);
     });
 }
@@ -511,9 +511,7 @@ export function generateExecutionJson(report: UpgradeReport, opts?: SerializeOpt
 export function generateValidationJson(report: UpgradeReport, opts?: SerializeOptions): string {
   const stepOrder = ['install', 'build', 'test', 'lint'];
   const sortSteps = (steps: BuildValidationResult[]) =>
-    [...steps].sort(
-      (a, b) => stepOrder.indexOf(a.step) - stepOrder.indexOf(b.step),
-    );
+    [...steps].sort((a, b) => stepOrder.indexOf(a.step) - stepOrder.indexOf(b.step));
 
   const postMigration = sortSteps(report.buildValidation ?? []).map((r) => ({
     durationMs: r.durationMs ?? null,

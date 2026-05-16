@@ -13,7 +13,14 @@ import {
 } from './doc-generator.js';
 
 export interface ArtifactResult {
-  format: ArtifactFormat | 'analysis' | 'execution' | 'findings' | 'plan' | 'session' | 'validation';
+  format:
+    | ArtifactFormat
+    | 'analysis'
+    | 'execution'
+    | 'findings'
+    | 'plan'
+    | 'session'
+    | 'validation';
   filePath: string;
 }
 

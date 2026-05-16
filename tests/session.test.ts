@@ -65,9 +65,11 @@ describe('session persistence', () => {
 
   it('updateSession updates lastUpdatedAt each time', async () => {
     const s1 = updateSession(tmpDir, { phase: 'discovery' });
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
     const s2 = updateSession(tmpDir, { phase: 'planning' });
-    expect(new Date(s2.lastUpdatedAt).getTime()).toBeGreaterThan(new Date(s1.lastUpdatedAt).getTime());
+    expect(new Date(s2.lastUpdatedAt).getTime()).toBeGreaterThan(
+      new Date(s1.lastUpdatedAt).getTime(),
+    );
   });
 
   it('newSession initialises with discovery phase', () => {

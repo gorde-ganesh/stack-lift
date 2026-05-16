@@ -14,13 +14,31 @@ beforeEach(() => {
     const results = new Map<string, registry.RegistryPackageInfo | null>();
     for (const name of names) {
       if (name === 'tslint') {
-        results.set(name, { name, latest: '6.1.3', deprecated: 'Deprecated Jan 2020. Migrate to ESLint + @typescript-eslint.', hasBreakingChanges: false, riskOverride: 'high' });
+        results.set(name, {
+          name,
+          latest: '6.1.3',
+          deprecated: 'Deprecated Jan 2020. Migrate to ESLint + @typescript-eslint.',
+          hasBreakingChanges: false,
+          riskOverride: 'high',
+        });
       } else if (name === 'codelyzer') {
-        results.set(name, { name, latest: '6.0.2', deprecated: 'Deprecated. Use angular-eslint instead.', hasBreakingChanges: false, riskOverride: 'high' });
+        results.set(name, {
+          name,
+          latest: '6.0.2',
+          deprecated: 'Deprecated. Use angular-eslint instead.',
+          hasBreakingChanges: false,
+          riskOverride: 'high',
+        });
       } else if (name === 'rxjs') {
         results.set(name, { name, latest: '7.8.1', hasBreakingChanges: true });
       } else if (name === 'react-scripts') {
-        results.set(name, { name, latest: '5.0.1', deprecated: 'Create React App is unmaintained. Migrate to Vite or Next.js.', hasBreakingChanges: false, riskOverride: 'high' });
+        results.set(name, {
+          name,
+          latest: '5.0.1',
+          deprecated: 'Create React App is unmaintained. Migrate to Vite or Next.js.',
+          hasBreakingChanges: false,
+          riskOverride: 'high',
+        });
       } else if (name === '@angular/core') {
         results.set(name, { name, latest: '18.0.0', hasBreakingChanges: true });
       } else if (name === 'react') {

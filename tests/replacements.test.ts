@@ -20,7 +20,7 @@ describe('PACKAGE_REPLACEMENTS knowledge base', () => {
   it('protractor entry includes playwright as an alternative', () => {
     const entry = getReplacementEntry('protractor');
     expect(entry).toBeDefined();
-    const names = entry!.alternatives.map(a => a.name);
+    const names = entry!.alternatives.map((a) => a.name);
     expect(names).toContain('@playwright/test');
   });
 
@@ -54,7 +54,7 @@ describe('PACKAGE_REPLACEMENTS knowledge base', () => {
   it('@angular-material-components/datetime-picker has low-effort alternative', () => {
     const entry = getReplacementEntry('@angular-material-components/datetime-picker');
     expect(entry).toBeDefined();
-    const lowEffort = entry!.alternatives.find(a => a.migrationEffort === 'low');
+    const lowEffort = entry!.alternatives.find((a) => a.migrationEffort === 'low');
     expect(lowEffort).toBeDefined();
   });
 });

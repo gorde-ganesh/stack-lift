@@ -89,7 +89,9 @@ export function planUpgrade(
   const provider = getFrameworkProvider(framework);
 
   if (!provider) {
-    const supported = listFrameworkProviders().map((p) => p.framework).join(', ');
+    const supported = listFrameworkProviders()
+      .map((p) => p.framework)
+      .join(', ');
     throw new Error(
       `Upgrade planning for "${framework}" is not yet supported. Registered providers: ${supported || 'none'}`,
     );

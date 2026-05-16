@@ -88,7 +88,7 @@ describe('runInteractive — non-interactive mode', () => {
     });
     expect(fs.existsSync(outDir)).toBe(true);
     const files = fs.readdirSync(outDir);
-    expect(files.some(f => f.endsWith('.json'))).toBe(true);
+    expect(files.some((f) => f.endsWith('.json'))).toBe(true);
   });
 
   it('always writes machine artifacts in non-interactive mode', async () => {

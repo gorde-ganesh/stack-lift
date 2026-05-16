@@ -426,8 +426,8 @@ function buildFindingsList(report: UpgradeReport) {
     .sort((a, b) => {
       const typeOrder = (a['type'] as string).localeCompare(b['type'] as string);
       if (typeOrder !== 0) return typeOrder;
-      const aKey = ((a['package'] ?? a['file'] ?? '') as string);
-      const bKey = ((b['package'] ?? b['file'] ?? '') as string);
+      const aKey = (a['package'] ?? a['file'] ?? '') as string;
+      const bKey = (b['package'] ?? b['file'] ?? '') as string;
       return aKey.localeCompare(bKey);
     });
 }

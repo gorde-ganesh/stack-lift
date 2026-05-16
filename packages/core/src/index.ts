@@ -16,7 +16,11 @@ export { detectStack } from './detector/stack-detector.js';
 export { detectCiNodeVersions } from './detector/ci-detector.js';
 
 // Dependency intelligence
-export { analyzeDependencies, runSecurityAudit, detectTransitiveConflicts } from './dependency-intelligence/dependency-analyzer.js';
+export {
+  analyzeDependencies,
+  runSecurityAudit,
+  detectTransitiveConflicts,
+} from './dependency-intelligence/dependency-analyzer.js';
 export {
   getPackageInfo,
   getPackageInfoBatch,

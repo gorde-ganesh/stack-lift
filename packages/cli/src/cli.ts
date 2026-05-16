@@ -260,7 +260,11 @@ async function runAudit(
       if (options.markdown) formats.push('markdown');
       const outDir = path.resolve(resolved, options.outDir ?? './stacklift-output');
       const artifacts = writeArtifacts(report, outDir, formats);
-      const machineArtifacts = writeMachineArtifacts(report, outDir, options.stable ? { omitTimestamp: true } : undefined);
+      const machineArtifacts = writeMachineArtifacts(
+        report,
+        outDir,
+        options.stable ? { omitTimestamp: true } : undefined,
+      );
       for (const a of [...artifacts, ...machineArtifacts]) {
         console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
       }
@@ -507,7 +511,11 @@ program
           if (options.json) formats.push('json');
           const outDir = path.resolve(path.resolve(projectPath), options.outDir);
           const artifacts = writeArtifacts(report, outDir, formats);
-          const machineArtifacts = writeMachineArtifacts(report, outDir, options.stable ? { omitTimestamp: true } : undefined);
+          const machineArtifacts = writeMachineArtifacts(
+            report,
+            outDir,
+            options.stable ? { omitTimestamp: true } : undefined,
+          );
           for (const a of [...artifacts, ...machineArtifacts]) {
             console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
           }
