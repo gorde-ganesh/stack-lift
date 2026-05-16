@@ -90,6 +90,18 @@ function detectPackageManager(projectPath: string): PackageManager {
   return 'npm';
 }
 
+function detectTestRunner(projectPath: string, allDeps: Record<string, string>): string | undefined {
+  if (exists(path.join(projectPath, 'karma.conf.js')) || exists(path.join(projectPath, 'karma.conf.ts'))) return 'Karma';
+  if (exists(path.join(projectPath, 'jest.config.js')) || exists(path.join(projectPath, 'jest.config.ts'))) return 'Jest';
+  if (exists(path.join(projectPath, 'vitest.config.ts')) || exists(path.join(projectPath, 'vitest.config.js'))) return 'Vitest';
+  if (allDeps['@playwright/test']) return 'Playwright';
+  if (allDeps['cypress']) return 'Cypress';
+  if (allDeps['karma']) return 'Karma';
+  if (allDeps['vitest']) return 'Vitest';
+  if (allDeps['jest']) return 'Jest';
+  return undefined;
+}
+
 function readNodeVersion(projectPath: string, pkg: Record<string, unknown>): string | undefined {
   for (const file of ['.nvmrc', '.node-version']) {
     const p = path.join(projectPath, file);
@@ -100,6 +112,57 @@ function readNodeVersion(projectPath: string, pkg: Record<string, unknown>): str
   const engines = pkg['engines'] as Record<string, string> | undefined;
   if (engines?.['node']) return stripRange(engines['node']);
   return undefined;
+}
+
+function parseYarnLock(projectPath: string): { versions: Record<string, string>; parsed: boolean } {
+  const lockPath = path.join(projectPath, 'yarn.lock');
+  if (!fs.existsSync(lockPath)) return { versions: {}, parsed: false };
+
+  let content: string;
+  try {
+    content = fs.readFileSync(lockPath, 'utf-8');
+  } catch {
+    return { versions: {}, parsed: false };
+  }
+
+  const versions: Record<string, string> = {};
+  // Match both classic yarn (version "x.y.z") and berry (version: x.y.z)
+  // Block header format: "pkg@range", "pkg@range1", "pkg@r1, pkg@r2":
+  const blockRe = /^"?([^@\s"]+)@[^:]+:?\s*\n(?:[\s\S]*?\n)?\s+version[: ]+"?([^\s"]+)"?/gm;
+  let match: RegExpExecArray | null;
+  while ((match = blockRe.exec(content)) !== null) {
+    const name = match[1]?.trim();
+    const ver = match[2]?.trim();
+    if (name && ver && !versions[name]) {
+      versions[name] = ver;
+    }
+  }
+  return { versions, parsed: Object.keys(versions).length > 0 };
+}
+
+function parsePnpmLock(projectPath: string): { versions: Record<string, string>; parsed: boolean } {
+  const lockPath = path.join(projectPath, 'pnpm-lock.yaml');
+  if (!fs.existsSync(lockPath)) return { versions: {}, parsed: false };
+
+  let content: string;
+  try {
+    content = fs.readFileSync(lockPath, 'utf-8');
+  } catch {
+    return { versions: {}, parsed: false };
+  }
+
+  const versions: Record<string, string> = {};
+  // pnpm-lock.yaml v6+: packages section keys look like "/package-name@1.2.3" or "package-name@1.2.3:"
+  const pkgRe = /^\s{2}(?:\/)?([^@\s/][^@\s]*)@([^\s:(/]+)/gm;
+  let match: RegExpExecArray | null;
+  while ((match = pkgRe.exec(content)) !== null) {
+    const name = match[1]?.trim();
+    const ver = match[2]?.trim();
+    if (name && ver && !versions[name]) {
+      versions[name] = ver;
+    }
+  }
+  return { versions, parsed: Object.keys(versions).length > 0 };
 }
 
 /**
@@ -198,8 +261,18 @@ export function detectStack(projectPath: string): StackInfo {
 
   const [framework, frameworkVersion] = detectFramework(deps, devDeps);
   const isMonorepo = detectIsMonorepo(resolved, pkg);
-  const { versions: resolvedVersions, parsed: lockfileParsed } = parseLockfile(resolved);
+  const pm = detectPackageManager(resolved);
+  let lockfileResult: { versions: Record<string, string>; parsed: boolean };
+  if (pm === 'yarn') {
+    lockfileResult = parseYarnLock(resolved);
+  } else if (pm === 'pnpm') {
+    lockfileResult = parsePnpmLock(resolved);
+  } else {
+    lockfileResult = parseLockfile(resolved);
+  }
+  const { versions: resolvedVersions, parsed: lockfileParsed } = lockfileResult;
   const tsconfig = readTsconfig(resolved);
+  const testRunner = detectTestRunner(resolved, all);
 
   const nodeVersion = readNodeVersion(resolved, pkg);
   const tsVer = all['typescript'];
@@ -211,7 +284,7 @@ export function detectStack(projectPath: string): StackInfo {
     ...(rxjsVer ? { rxjs: stripRange(rxjsVer) } : {}),
     buildTool: detectBuildTool(resolved, deps, devDeps),
     ...(nodeVersion !== undefined ? { nodeVersion } : {}),
-    packageManager: detectPackageManager(resolved),
+    packageManager: pm,
     projectPath: resolved,
     rawDependencies: deps,
     rawDevDependencies: devDeps,
@@ -219,5 +292,6 @@ export function detectStack(projectPath: string): StackInfo {
     lockfileParsed,
     ...(tsconfig !== undefined ? { tsconfig } : {}),
     isMonorepo,
+    ...(testRunner !== undefined ? { testRunner } : {}),
   };
 }

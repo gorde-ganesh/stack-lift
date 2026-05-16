@@ -379,6 +379,87 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     ],
     skipOption: 'Keep classnames (still maintained, no security risk)',
   },
+
+  'react-router': {
+    deprecated: 'react-router',
+    reason: 'react-router v5 has significant breaking changes in v6 (removed <Switch>, <Redirect>, hook-based navigation).',
+    alternatives: [
+      {
+        name: 'react-router-dom@6',
+        description: 'Current stable release — v6 API is cleaner and fully tree-shakeable',
+        apiSimilarity: 'medium',
+        migrationEffort: 'medium',
+        notes: 'Replace <Switch> with <Routes>, <Redirect> with <Navigate>, useHistory with useNavigate',
+      },
+      {
+        name: 'react-router-dom@7',
+        description: 'v7 unifies react-router and react-router-dom; adds React 19 support',
+        apiSimilarity: 'medium',
+        migrationEffort: 'medium',
+        notes: 'Recommended if upgrading to React 19; official migration guide at reactrouter.com',
+      },
+    ],
+    skipOption: 'Keep react-router v5 temporarily (higher tech debt risk)',
+  },
+
+  'react-router-dom': {
+    deprecated: 'react-router-dom',
+    reason: 'react-router-dom v5 has significant breaking changes in v6.',
+    alternatives: [
+      {
+        name: 'react-router-dom@6',
+        description: 'Current stable release — v6 removes Switch, Redirect, and history prop patterns',
+        apiSimilarity: 'medium',
+        migrationEffort: 'medium',
+        notes: 'See reactrouter.com/en/v6/upgrading/v5 for official migration steps',
+      },
+      {
+        name: 'react-router-dom@7',
+        description: 'v7 with React 19 support; merges react-router and react-router-dom packages',
+        apiSimilarity: 'medium',
+        migrationEffort: 'medium',
+      },
+    ],
+    skipOption: 'Keep react-router-dom v5 temporarily',
+  },
+
+  'redux': {
+    deprecated: 'redux',
+    reason: 'redux alone requires significant boilerplate. Redux Toolkit (RTK) is the officially recommended way to write Redux logic.',
+    alternatives: [
+      {
+        name: '@reduxjs/toolkit',
+        description: 'Official Redux wrapper — eliminates boilerplate with createSlice, createAsyncThunk',
+        apiSimilarity: 'high',
+        migrationEffort: 'medium',
+        notes: 'RTK Query can replace react-query/axios patterns for data fetching',
+      },
+      {
+        name: 'zustand',
+        description: 'Minimal state management, ~1KB, no boilerplate',
+        apiSimilarity: 'low',
+        migrationEffort: 'high',
+        bundleNote: '~1KB',
+        notes: 'Best for new projects or full rewrites',
+      },
+    ],
+    skipOption: 'Keep vanilla redux temporarily',
+  },
+
+  'react-query': {
+    deprecated: 'react-query',
+    reason: 'react-query was renamed to @tanstack/react-query starting from v4.',
+    alternatives: [
+      {
+        name: '@tanstack/react-query',
+        description: 'Current package name — v5 has a fully stable API with many improvements',
+        apiSimilarity: 'high',
+        migrationEffort: 'low',
+        notes: 'Import from @tanstack/react-query; v4 → v5 has minor breaking changes',
+      },
+    ],
+    skipOption: 'Keep react-query temporarily',
+  },
 };
 
 /** Returns the replacement entry for a package name, or undefined if not known. */

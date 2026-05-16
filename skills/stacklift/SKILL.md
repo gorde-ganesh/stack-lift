@@ -152,9 +152,13 @@ Execute these steps in order. Use the tools available (Read, Bash, Grep, etc.) t
 
 ### Step 0 — Gather Inputs (REQUIRED — do not skip)
 
-Before reading any project files, use the `AskUserQuestion` tool to ask the user the following questions. Do NOT proceed to Step 1 until you have answers.
+**Session resume check:** Before anything else, check if `.stacklift/session.json` exists in the project root. If it does and the `phase` field is not `'done'`, ask: "A previous session was found from [lastUpdatedAt timestamp]. Resume it?" — Yes (load saved state and skip to the appropriate phase) or No (start fresh, clear the session file).
 
-Send a single `AskUserQuestion` call with these three questions:
+**Quick stack scan:** Read only `package.json` from the project root to extract the current framework and version. This is needed to populate target version choices in Question 2. Do not run full stack detection yet — that is Step 1.
+
+Once you have the framework and version from package.json, use the `AskUserQuestion` tool to ask the following four questions. Do NOT proceed to Step 1 until you have answers.
+
+Send a single `AskUserQuestion` call with these four questions:
 
 **Question 1** — "What is your migration objective?"
 - "Minimal risk — make the build pass, touch as little as possible"
@@ -163,12 +167,17 @@ Send a single `AskUserQuestion` call with these three questions:
 - "Performance — move to Vite/esbuild, reduce bundle size"
 - "Full migration — framework, deps, tooling, and patterns"
 
-**Question 2** — "Where should the report be saved?"
+**Question 2** — "Which version do you want to upgrade to?"
+- "Latest stable (auto-detect after scanning)" — pre-select when objective is not 'minimal-risk'
+- "One major version up from current (lowest risk)" — pre-select when objective is 'minimal-risk'
+- "I'll specify manually" (collect via Other — user enters a version number)
+
+**Question 3** — "Where should the report be saved?"
 - "Write to ./stacklift-output/ directory (Recommended)"
 - "Print inline in terminal"
 - "Write to a custom path" (collect via Other)
 
-**Question 3** — "Create a safety backup before starting?"
+**Question 4** — "Create a safety backup before starting?"
 - "Create a git branch (git checkout -b upgrade/stack-lift)"
 - "Create a git tag  (git tag pre-upgrade-backup)"
 - "No backup — I will manage it myself"
@@ -219,9 +228,24 @@ turbo.json             — confirms Turborepo monorepo
 - `bun.lockb` → bun
 - default → npm
 
-**Lockfile parsing**: If `package-lock.json` exists, parse resolved (exact installed) versions. Supports lockfileVersion 1 (dependencies map) and 2/3 (packages map keyed as `node_modules/<pkg>`). Resolved versions take precedence over declared ranges in package.json.
+**Lockfile parsing**: If `package-lock.json` exists, parse resolved (exact installed) versions. Supports lockfileVersion 1 (dependencies map) and 2/3 (packages map keyed as `node_modules/<pkg>`). If `yarn.lock` is the lockfile, parse it for resolved versions using the `<package>@<range>:\n  version "<exact>"` block format. If `pnpm-lock.yaml` is the lockfile, parse the `packages:` map for resolved versions. Resolved versions always take precedence over declared ranges in package.json.
 
 **tsconfig.json fields to extract**: `strict`, `target`, `module`, `moduleResolution`, `useDefineForClassFields`, `experimentalDecorators`, `emitDecoratorMetadata`
+
+**Test runner detection** — check for the following in addition to framework detection:
+
+| Signal | Test runner |
+|--------|-------------|
+| `karma.conf.js` or `karma.conf.ts` present | Karma |
+| `jest.config.js` or `jest.config.ts` present | Jest |
+| `vitest.config.ts` or `vitest.config.js` present | Vitest |
+| `@playwright/test` in devDependencies | Playwright |
+| `cypress` in devDependencies | Cypress |
+| `karma` in devDependencies (fallback) | Karma |
+| `jest` in devDependencies (fallback) | Jest |
+| `vitest` in devDependencies (fallback) | Vitest |
+
+Add `"testRunner"` to the extracted JSON block. If Karma is detected, include a dedicated migration recommendation: Karma reached end-of-life in 2023; migrate to `@web/test-runner`, `jest`, or `vitest`.
 
 **Monorepo detection**: Flag if `workspaces` in package.json, or `pnpm-workspace.yaml`, `lerna.json`, `nx.json`, `turbo.json` are present. In a monorepo, note that root-level tsconfig, shared builders, and common library packages affect all projects. Analyze each workspace package's package.json independently, but flag root-level shared dependencies explicitly.
 
@@ -237,9 +261,21 @@ Extract and report:
   "nodeVersion": "14",
   "packageManager": "npm",
   "lockfileParsed": true,
-  "isMonorepo": false
+  "isMonorepo": false,
+  "testRunner": "Karma"
 }
 ```
+
+After Step 1 completes, print a one-line summary:
+```
+Detected: Angular 15 | Angular CLI | npm | lockfile: parsed | tests: Karma
+```
+
+**Unsupported framework exit:** If the detected framework is Vue, Nuxt, Svelte, or Unknown, print:
+> "Full upgrade support is available for Angular (v11–v20) and React (v16–v19) only. Vue, Nuxt, and Svelte support is planned for v2."
+> "Running dependency audit only (Steps 2 and 8). Skipping framework upgrade steps (Steps 3–7)."
+
+Then execute Steps 2 and 8 only. Do not continue to Steps 3–7.
 
 ### Step 2 — Analyze Dependencies
 
@@ -286,6 +322,11 @@ Also flag with `critical` or `high`:
 - Any package more than 2 major versions behind
 - Any peer-dependency conflict with the target framework version
 
+After Step 2 completes, print a one-line summary:
+```
+Dependencies: 6 outdated, 2 deprecated, 1 peer conflict
+```
+
 **Confidence scoring** — every finding must include a confidence label:
 
 | Label | When |
@@ -298,24 +339,28 @@ Never present a `low` or `medium` confidence finding as a certain fact.
 
 ### Step 3 — Build the Upgrade Path
 
+**Already-on-latest short-circuit:** If the project is already on the latest supported version (Angular 20 or React 19), skip Steps 3–7. Print: "Already on latest supported version. Running dependency audit only." Then execute Steps 2 and 8 only.
+
 **Angular upgrade path rules:**
 - Go one major version at a time: 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20
 - For each hop, apply the full ng update schematic: `ng update @angular/core@N @angular/cli@N`
+- If `@angular/material` or `@angular/cdk` are installed, they must be upgraded in sync with `@angular/core`. Include `ng update @angular/cdk@N @angular/material@N` in every hop where they are detected.
 - TypeScript must be within the supported range for each Angular version (see table below)
-- RxJS must be upgraded at the Angular 13 boundary (5.x → 6.x) and Angular 16 boundary (6.x → 7.x)
+- RxJS upgrade rules: must be on RxJS 6.x before Angular 12. Upgrade 6→7 at the Angular 12→13 boundary. No further major RxJS upgrade is required through v20.
+- If `.nvmrc` or `engines.node` is below the target Angular version's minimum Node.js requirement, flag as a high-risk blocker before proceeding.
 
-**Angular TypeScript compatibility:**
-| Angular | TypeScript | RxJS |
-|---------|-----------|------|
-| 12 | ~4.2 | ~6.6 |
-| 13 | ~4.4 | ~7.4 |
-| 14 | ~4.6 | ~7.5 |
-| 15 | ~4.8 | ~7.5 |
-| 16 | ~5.0 | ~7.8 |
-| 17 | ~5.2 | ~7.8 |
-| 18 | ~5.4 | ~7.8 |
-| 19 | ~5.6 | ~7.8 |
-| 20 | ~5.8 | ~7.8 |
+**Angular TypeScript and Node.js compatibility:**
+| Angular | TypeScript | RxJS   | Node.js min         |
+|---------|-----------|--------|---------------------|
+| 12      | ~4.2      | ~6.6   | 12.20+              |
+| 13      | ~4.4      | ~7.4   | 12.20+ / 14.15+     |
+| 14      | ~4.6      | ~7.5   | 14.15+ / 16.10+     |
+| 15      | ~4.8      | ~7.5   | 14.20+ / 16.13+     |
+| 16      | ~5.0      | ~7.8   | **16.14+**          |
+| 17      | ~5.2      | ~7.8   | **18.13+**          |
+| 18      | ~5.4      | ~7.8   | 18.19+              |
+| 19      | ~5.6      | ~7.8   | 18.19+              |
+| 20      | ~5.8      | ~7.8   | 18.19+              |
 
 **React upgrade path rules:**
 - React 16 → 17 → 18 → 19
@@ -331,7 +376,12 @@ Compute:
 - Number of automated (AST-safe) fixes
 - Number of manual intervention items
 - Risk level: `low` / `medium` / `high` / `critical`
-- Estimated effort: always show the basis (e.g. "1–2 days based on 8 breaking changes, 3 automated")
+- Estimated effort: always show the basis (e.g. "1–2 days based on 8 breaking changes, 3 automated, across 42 affected files")
+
+After Step 3 completes, print a one-line summary:
+```
+Upgrade path: 5 hops, high risk, ~1–2 days
+```
 
 ### Step 4 — Inventory Breaking Changes
 
@@ -350,11 +400,16 @@ For each version hop in the plan, enumerate every significant breaking change. F
 
 Prioritize high-severity changes first. Group by version hop. For each hop, include the migration guide URL obtained via WebSearch/WebFetch (see Citations in Evidence Standards). For Angular, also include a brief summary of any additional breaking changes found in the fetched page that are not in the static catalogue — label them `confidence: medium — live doc`.
 
+After Step 4 completes, print a one-line summary:
+```
+Breaking changes: 14 catalogued, 3 auto-fixable
+```
+
 ### Step 5 — Scan Source Files
 
-If the user has provided access to the project source, scan for occurrences of each breaking change's `searchPattern` using Grep or Read tools.
+Scan all source files under the project root using Grep for each breaking change's `searchPattern`. If the directory is inaccessible, note "source scan skipped" and continue.
 
-Ignore: `node_modules`, `dist`, `build`, `.git`, `coverage`, `.angular`
+Exclude directories: `node_modules`, `dist`, `build`, `.git`, `coverage`, `.angular`
 Scan extensions: `.ts`, `.tsx`, `.js`, `.jsx`, `.html`, `.json`
 
 Report per-file, per-line locations:
@@ -368,6 +423,13 @@ src/main.ts:6               ReactDOM.render(  → replace with createRoot().rend
 Group by:
 1. Files with automated fixes available
 2. Files requiring manual attention
+
+**Deduplication:** Suggestions are deduplicated by `(file, line, api)`. The same file:line may appear for different APIs from different hops — each is a distinct required change, not a duplicate.
+
+After Step 5 completes, print a one-line summary:
+```
+Source scan: 142 files, 6 locations found
+```
 
 ### Step 6 — Generate Code Refactoring Guidance
 
@@ -423,8 +485,10 @@ Check and advise on config file changes:
 Generate a structured report. The output destination is determined by the user's answer in Step 0.
 
 **If user chose file output (default):**
-- Use the Write tool to create `UPGRADE_REPORT.md` in `./stacklift-output/` (or the custom path specified)
-- After writing, print one short confirmation: `Report written to ./stacklift-output/UPGRADE_REPORT.md`
+- Use the Write tool to create the report in `./stacklift-output/` (or the custom path specified)
+- The primary report filename follows the pattern: `stacklift-report-{framework}-{fromVersion}-to-{toVersion}.md` (e.g. `stacklift-report-angular-15-to-20.md`)
+- Companion artifacts also written: `stacklift-report-{slug}.json` (full JSON report), `findings.json` (code locations), `plan.json` (machine-readable upgrade plan)
+- After writing, print one short confirmation: `Report written to ./stacklift-output/stacklift-report-{slug}.md`
 
 **If user chose terminal output:**
 - Stream the full report inline as markdown
@@ -445,9 +509,11 @@ The report must include:
 
 **Default: write to file.** Unless the user chose "Print inline in terminal" in Step 0, always write the report using the Write tool. Do not stream the full report as inline text.
 
-File targets:
-- `./stacklift-output/UPGRADE_REPORT.md` — full upgrade report (default)
-- Custom path — if specified by the user in Step 0
+File targets (all written to `./stacklift-output/` or the custom path from Step 0):
+- `stacklift-report-{framework}-{fromVersion}-to-{toVersion}.md` — full upgrade report (default markdown)
+- `stacklift-report-{framework}-{fromVersion}-to-{toVersion}.json` — JSON version (for CI/tooling)
+- `findings.json` — flat list of all code locations to change
+- `plan.json` — machine-readable upgrade plan (steps, risk, effort)
 
 After writing, print one short confirmation line: `Report written to ./stacklift-output/UPGRADE_REPORT.md`
 
@@ -542,7 +608,7 @@ See `examples/` for worked migration requests:
 
 - **No runtime execution (skill mode)**: This AI skill reads and analyzes files. It does not run `npm install`, `ng build`, or test suites. Use `stack-lift apply --validate` in the CLI for build validation.
 - **Knowledge cutoff**: The static knowledge base has a fixed version. StackLift mitigates this by fetching live official migration guides via WebSearch/WebFetch during each run (see Citations in Evidence Standards). If live fetching is unavailable, the static catalogue is used and a fallback notice is included in the report.
-- **Angular 10 start**: The knowledge base has Angular upgrade steps from v11 onward. If the project is on Angular 10, detect it but note that the v10→v11 step is not catalogued — advise consulting the official guide manually.
+- **Angular 10 start**: The knowledge base has Angular upgrade steps from v11 onward. If the project is on Angular 10, detect it but note that the v10→v11 step is not catalogued — advise consulting the official Angular update guide manually before continuing.
 - **Private packages**: Cannot analyze packages not in the npm registry.
 - **Monorepos**: When a monorepo is detected, analyze each workspace package's package.json independently, but flag root-level shared dependencies explicitly.
 - **Runtime behavior**: Cannot detect runtime-only regressions (e.g. timing-sensitive effects in React 18 concurrent mode). Always run tests after upgrading.

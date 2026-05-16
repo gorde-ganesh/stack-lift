@@ -245,6 +245,17 @@ async function askOutputDir(nonInteractive: boolean, defaultDir?: string): Promi
   });
 }
 
+// ── Git safety ────────────────────────────────────────────────────────────────
+
+function isGitDirty(projectPath: string): boolean {
+  try {
+    const output = execSync('git status --porcelain', { cwd: projectPath, stdio: 'pipe' }).toString().trim();
+    return output.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 // ── Git backup ────────────────────────────────────────────────────────────────
 
 function applyBackup(projectPath: string, strategy: BackupStrategy): void {
@@ -518,17 +529,38 @@ export async function runInteractive(
 
   // ── Backup ─────────────────────────────────────────────────────────────────
   if (backupStrategy !== 'none') {
+    if (!ni && isGitDirty(resolved)) {
+      console.log('');
+      console.log(chalk.yellow('  ⚠ Working tree has uncommitted changes.'));
+      console.log(chalk.dim('  Creating a backup on a dirty tree will mix upgrade changes with your current work,'));
+      console.log(chalk.dim('  making code review and rollback harder.'));
+      const proceed = await confirm({
+        message: 'Stash or commit your changes first is recommended. Proceed anyway?',
+        default: false,
+      });
+      if (!proceed) {
+        console.log(chalk.dim('  Aborted. Stash or commit your changes then re-run.\n'));
+        process.exit(0);
+      }
+    }
     applyBackup(resolved, backupStrategy);
   }
 
   // ── Planning + analysis ────────────────────────────────────────────────────
+  // Initial plan without size hint — re-plan after scanning to calibrate effort
   const planSpinner = ora('Building upgrade plan…').start();
-  const plan = planUpgrade(stack, targetVersion);
-  planSpinner.succeed(`Plan ready: ${plan.steps.length} step(s), effort ${plan.estimatedEffort}`);
+  const initialPlan = planUpgrade(stack, targetVersion);
+  planSpinner.succeed(`Plan: ${initialPlan.steps.length} hop(s) — scanning source for size calibration…`);
 
   const codeSpinner = ora('Scanning source files for breaking-change patterns…').start();
-  const codeSuggestions = analyzeBreakingChanges(resolved, plan);
+  const codeSuggestions = analyzeBreakingChanges(resolved, initialPlan);
   codeSpinner.succeed(`Found ${codeSuggestions.length} code location(s) to review`);
+
+  const affectedFiles = new Set(codeSuggestions.map(s => s.file)).size;
+  const plan = planUpgrade(stack, targetVersion, { affectedFiles, totalOccurrences: codeSuggestions.length });
+
+  const planSpinner2 = ora(`Effort calibrated: ${plan.estimatedEffort} (${affectedFiles} file(s), ${codeSuggestions.length} location(s))`).start();
+  planSpinner2.succeed(`Plan ready: ${plan.steps.length} step(s), ${plan.riskLevel} risk, effort ${plan.estimatedEffort}`);
 
   const byFile = new Map<string, typeof codeSuggestions>();
   for (const s of codeSuggestions) {

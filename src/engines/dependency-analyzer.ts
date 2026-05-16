@@ -1,6 +1,7 @@
 import semver from 'semver';
+import { execSync } from 'node:child_process';
 import { getPackageInfoBatch } from './npm-registry.js';
-import type { StackInfo, DependencyInfo, PeerDepConflict, RiskLevel } from '../types/index.js';
+import type { StackInfo, DependencyInfo, PeerDepConflict, RiskLevel, PackageManager } from '../types/index.js';
 
 function stripRange(version: string): string {
   return (version.replace(/^[\^~>=<*]+/, '').split(' ')[0] ?? '').split('-')[0] ?? '';
@@ -152,4 +153,141 @@ export async function analyzeDependencies(stack: StackInfo): Promise<DependencyA
   }
 
   return { outdated, peerConflicts };
+}
+
+// ── Security audit ────────────────────────────────────────────────────────────
+
+interface AuditVulnerability {
+  name: string;
+  severity: 'critical' | 'high' | 'moderate' | 'low' | 'info';
+  via: string[];
+  range: string;
+  fixAvailable: boolean | { name: string; version: string; isSemVerMajor: boolean };
+  cve?: string[];
+}
+
+function auditCommand(packageManager: PackageManager): string {
+  switch (packageManager) {
+    case 'pnpm': return 'pnpm audit --json';
+    case 'yarn': return 'yarn audit --json';
+    case 'bun': return 'bun audit';
+    default: return 'npm audit --json';
+  }
+}
+
+export async function runSecurityAudit(
+  projectPath: string,
+  packageManager: PackageManager,
+): Promise<DependencyInfo[]> {
+  const cmd = auditCommand(packageManager);
+  let raw: string;
+  try {
+    raw = execSync(cmd, { cwd: projectPath, stdio: 'pipe', timeout: 30000 }).toString();
+  } catch (err) {
+    // npm/pnpm audit exits non-zero when vulnerabilities exist — capture stderr
+    raw = (err as { stdout?: Buffer; stderr?: Buffer }).stdout?.toString() ?? '';
+    if (!raw) return [];
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return [];
+  }
+
+  const vulnerabilities = (parsed['vulnerabilities'] ?? parsed['advisories']) as
+    | Record<string, AuditVulnerability>
+    | undefined;
+  if (!vulnerabilities) return [];
+
+  const findings: DependencyInfo[] = [];
+  for (const [name, vuln] of Object.entries(vulnerabilities)) {
+    const severityMap: Record<string, RiskLevel> = {
+      critical: 'critical',
+      high: 'high',
+      moderate: 'medium',
+      low: 'low',
+      info: 'low',
+    };
+    const cves = vuln.cve?.length ? ` CVE: ${vuln.cve.join(', ')}` : '';
+    findings.push({
+      name,
+      current: vuln.range ?? 'unknown',
+      latest: 'unknown',
+      type: 'dependencies',
+      risk: severityMap[vuln.severity] ?? 'medium',
+      riskCategory: 'vulnerable',
+      breakingChanges: false,
+      deprecated: false,
+      reason: `${vuln.severity} vulnerability.${cves} Fix available: ${vuln.fixAvailable ? 'yes' : 'no'}`,
+      latestSource: 'registry',
+      observedIn: 'npm audit',
+      confidence: 'high',
+    });
+  }
+
+  return findings;
+}
+
+// ── Transitive conflict detection ─────────────────────────────────────────────
+
+const FRAMEWORK_ECOSYSTEM_PACKAGES = new Set([
+  '@angular/core', '@angular/common', '@angular/forms', '@angular/router',
+  '@angular/platform-browser', '@angular/cdk', '@angular/material',
+  'rxjs', 'zone.js', 'react', 'react-dom', 'react-router-dom',
+]);
+
+export interface TransitiveConflict {
+  transitivePackage: string;
+  transitiveVersion: string;
+  parentPackage: string;
+  peerRequirement: string;
+  installedVersion: string;
+}
+
+export async function detectTransitiveConflicts(
+  stack: StackInfo,
+  targetFrameworkVersion: string,
+): Promise<TransitiveConflict[]> {
+  const allDeps = new Map<string, string>();
+  for (const [name, ver] of Object.entries(stack.rawDependencies)) allDeps.set(name, ver);
+  for (const [name, ver] of Object.entries(stack.rawDevDependencies)) if (!allDeps.has(name)) allDeps.set(name, ver);
+
+  const packageNames = Array.from(allDeps.keys());
+  const registryData = await getPackageInfoBatch(packageNames);
+  const conflicts: TransitiveConflict[] = [];
+
+  for (const [pkgName] of allDeps) {
+    const info = registryData.get(pkgName);
+    if (!info?.peerDependencies) continue;
+
+    for (const [peer, requiredRange] of Object.entries(info.peerDependencies)) {
+      if (!FRAMEWORK_ECOSYSTEM_PACKAGES.has(peer)) continue;
+
+      const installedEntry = allDeps.get(peer);
+      if (!installedEntry) continue;
+
+      const installedVersion = stack.resolvedVersions?.[peer] ?? installedEntry.replace(/^[\^~>=<*]+/, '');
+      const coerced = semver.coerce(installedVersion);
+      if (!coerced) continue;
+
+      // Check against the *target* version, not installed
+      const targetCoerced = semver.coerce(targetFrameworkVersion);
+      if (!targetCoerced) continue;
+
+      const satisfiesTarget = semver.satisfies(targetCoerced, requiredRange, { includePrerelease: false });
+      if (!satisfiesTarget) {
+        conflicts.push({
+          transitivePackage: pkgName,
+          transitiveVersion: info.latest,
+          parentPackage: peer,
+          peerRequirement: requiredRange,
+          installedVersion,
+        });
+      }
+    }
+  }
+
+  return conflicts;
 }

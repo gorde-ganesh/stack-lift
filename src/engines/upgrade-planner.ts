@@ -26,15 +26,31 @@ function computeRisk(steps: UpgradeStep[]): RiskLevel {
   return 'low';
 }
 
-function estimateEffort(steps: UpgradeStep[]): { effort: string; basis: string } {
+function estimateEffort(
+  steps: UpgradeStep[],
+  affectedFileCount?: number,
+  totalOccurrences?: number,
+): { effort: string; basis: string } {
   const totalChanges = steps.flatMap((s) => s.breakingChanges).length;
   const manualCount = steps.flatMap((s) => s.manualActions).length;
-  const basis = `${totalChanges} catalogued breaking changes, ${manualCount} manual actions across ${steps.length} hop(s) — does not account for codebase size, test coverage, or CI complexity`;
 
-  if (totalChanges === 0 && manualCount <= 2) return { effort: '1–2 hours', basis };
-  if (totalChanges <= 3 && manualCount <= 5) return { effort: '2–4 hours', basis };
-  if (totalChanges <= 6) return { effort: '1–2 days', basis };
-  if (totalChanges <= 12) return { effort: '2–5 days', basis };
+  const filePart = affectedFileCount !== undefined ? `, ${affectedFileCount} affected file(s)` : '';
+  const occPart = totalOccurrences !== undefined ? `, ${totalOccurrences} occurrence(s) in source` : '';
+  const basis = `${totalChanges} catalogued breaking changes, ${manualCount} manual actions across ${steps.length} hop(s)${filePart}${occPart} — does not account for test coverage or CI complexity`;
+
+  // Scale effort up if codebase is large (many affected files or occurrences)
+  const sizeMultiplier =
+    (affectedFileCount ?? 0) > 100 || (totalOccurrences ?? 0) > 200 ? 2
+    : (affectedFileCount ?? 0) > 30 || (totalOccurrences ?? 0) > 50 ? 1.5
+    : 1;
+
+  const baseScore = totalChanges + manualCount * 0.5;
+  const scaledScore = baseScore * sizeMultiplier;
+
+  if (scaledScore === 0 && manualCount <= 2) return { effort: '1–2 hours', basis };
+  if (scaledScore <= 4) return { effort: '2–4 hours', basis };
+  if (scaledScore <= 9) return { effort: '1–2 days', basis };
+  if (scaledScore <= 18) return { effort: '2–5 days', basis };
   return { effort: '1–2 weeks', basis };
 }
 
@@ -71,7 +87,11 @@ function validateVersions(
   }
 }
 
-export function planUpgrade(stack: StackInfo, targetVersion?: string): UpgradePlan {
+export function planUpgrade(
+  stack: StackInfo,
+  targetVersion?: string,
+  sizeHint?: { affectedFiles?: number; totalOccurrences?: number },
+): UpgradePlan {
   const { framework, frameworkVersion } = stack;
   const fromMajor = majorOf(frameworkVersion);
   const toMajor = resolveTargetVersion(stack, targetVersion);
@@ -93,7 +113,7 @@ export function planUpgrade(stack: StackInfo, targetVersion?: string): UpgradePl
   const strategy = steps.length > 1 ? 'incremental' : 'direct';
   const totalBreakingChanges = steps.reduce((n, s) => n + s.breakingChanges.length, 0);
   const totalAutomatedFixes = steps.reduce((n, s) => n + s.automatedFixes, 0);
-  const { effort, basis } = estimateEffort(steps);
+  const { effort, basis } = estimateEffort(steps, sizeHint?.affectedFiles, sizeHint?.totalOccurrences);
 
   return {
     framework,

@@ -129,6 +129,8 @@ export interface StackInfo {
   /** Key compiler options read from tsconfig.json. */
   tsconfig?: TsconfigInfo;
   isMonorepo?: boolean;
+  /** Detected test runner (Karma, Jest, Vitest, Playwright, Cypress). */
+  testRunner?: string;
 }
 
 export interface DependencyInfo {
@@ -182,6 +184,8 @@ export interface UpgradeStep {
   automatedFixes: number;
   manualActions: string[];
   npmInstall: string[];
+  /** Optional packages to install only when detected in the project (e.g. @angular/material, @angular/cdk). */
+  conditionalNpmInstall?: { packages: string[]; condition: string }[];
   /** Official migration guide URL for this hop. */
   referenceUrl?: string;
 }

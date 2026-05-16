@@ -171,3 +171,75 @@ export async function getPackageInfoBatch(
 export function clearCache(): void {
   cache.clear();
 }
+
+export interface CompatibleVersionResult {
+  /** Latest version whose peerDependencies are compatible with the target framework. */
+  safeVersion: string | null;
+  /** Absolute latest version on npm (may not be compatible). */
+  latest: string;
+  /** The peerDep range that blocks a higher version (if safeVersion < latest). */
+  incompatibleRange?: string;
+}
+
+/**
+ * Find the latest version of a package that is compatible with the target framework version.
+ * Queries the full package metadata (all versions) from npm to check peerDependencies.
+ * Example: resolveCompatibleVersion('primeng', '@angular/core', '14') returns primeng@14.x
+ * even though primeng@17+ is on npm, because primeng@17 requires @angular/core >=16.
+ */
+export async function resolveCompatibleVersion(
+  packageName: string,
+  frameworkPeerKey: string,
+  targetFrameworkVersion: string,
+): Promise<CompatibleVersionResult> {
+  const encoded = encodeURIComponent(packageName).replace('%40', '@').replace('%2F', '/');
+  const url = `https://registry.npmjs.org/${encoded}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return { safeVersion: null, latest: 'unknown' };
+
+    const data = (await res.json()) as {
+      'dist-tags'?: { latest?: string };
+      versions?: Record<string, { peerDependencies?: Record<string, string>; deprecated?: string }>;
+    };
+
+    const latestTag = data['dist-tags']?.latest ?? 'unknown';
+    const allVersions = Object.keys(data.versions ?? {});
+
+    // Sort versions descending — find the highest version that satisfies the target peer constraint
+    const targetMajor = parseInt(targetFrameworkVersion.split('.')[0] ?? '0', 10);
+    let safeVersion: string | null = null;
+    let incompatibleRange: string | undefined;
+
+    for (const ver of allVersions.reverse()) {
+      const vInfo = data.versions?.[ver];
+      if (!vInfo || vInfo.deprecated) continue;
+
+      const peerRange = vInfo.peerDependencies?.[frameworkPeerKey];
+      if (!peerRange) {
+        // No peer constraint — compatible
+        if (!safeVersion) safeVersion = ver;
+        continue;
+      }
+
+      // Check if our target major satisfies the peer range
+      const rangeMin = parseInt((peerRange.match(/>=\s*(\d+)/) ?? peerRange.match(/\^(\d+)/) ?? peerRange.match(/~(\d+)/) ?? [])[1] ?? '0', 10);
+      const rangeMax = parseInt((peerRange.match(/<\s*(\d+)/) ?? [])[1] ?? '999', 10);
+
+      if (targetMajor >= rangeMin && targetMajor < rangeMax) {
+        if (!safeVersion) safeVersion = ver;
+      } else if (!safeVersion) {
+        incompatibleRange = peerRange;
+      }
+    }
+
+    return { safeVersion, latest: latestTag, ...(incompatibleRange ? { incompatibleRange } : {}) };
+  } catch {
+    clearTimeout(timer);
+    return { safeVersion: null, latest: 'unknown' };
+  }
+}

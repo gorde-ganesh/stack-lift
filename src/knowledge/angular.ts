@@ -42,6 +42,7 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
     automatedFixes: 1,
     manualActions: [
       'Run: ng update @angular/core@12 @angular/cli@12',
+      'Run: ng update @angular/cdk@12 @angular/material@12 (if used)',
       'Remove enableIvy: true from tsconfig if present',
       'Replace @angular/http with @angular/common/http throughout',
     ],
@@ -56,6 +57,9 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'zone.js@~0.11.4',
       'rxjs@~6.6.0',
       'typescript@~4.2.0',
+    ],
+    conditionalNpmInstall: [
+      { packages: ['@angular/material@12', '@angular/cdk@12'], condition: '@angular/material detected' },
     ],
   },
 
@@ -120,6 +124,7 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
     automatedFixes: 1,
     manualActions: [
       'Run: ng update @angular/core@13 @angular/cli@13',
+      'Run: ng update @angular/cdk@13 @angular/material@13 (if used)',
       'Remove IE11 entries from browserslist',
       'Remove IE11 polyfills (classlist, web-animations-js) from polyfills.ts',
       'Replace TestBed.get() with TestBed.inject()',
@@ -134,6 +139,9 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'typescript@~4.4.0',
       'rxjs@~7.4.0',
       'zone.js@~0.11.4',
+    ],
+    conditionalNpmInstall: [
+      { packages: ['@angular/material@13', '@angular/cdk@13'], condition: '@angular/material detected' },
     ],
   },
 
@@ -182,6 +190,9 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'typescript@~4.6.0',
       'rxjs@~7.5.0',
     ],
+    conditionalNpmInstall: [
+      { packages: ['@angular/material@14', '@angular/cdk@14'], condition: '@angular/material detected' },
+    ],
   },
 
   '14-15': {
@@ -226,6 +237,7 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
     automatedFixes: 1,
     manualActions: [
       'Run: ng update @angular/core@15 @angular/cli@15',
+      'Run: ng update @angular/cdk@15 @angular/material@15 (if used) — note: Angular Material 15 is the MDC migration; expect component API changes',
       "Replace 'enabled' with 'enabledBlocking' in router initialNavigation option",
       'Replace DATE_PIPE_DEFAULT_TIMEZONE with DATE_PIPE_DEFAULT_OPTIONS',
     ],
@@ -237,6 +249,9 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       '@angular/router@15',
       'typescript@~4.8.0',
       'rxjs@~7.5.0',
+    ],
+    conditionalNpmInstall: [
+      { packages: ['@angular/material@15', '@angular/cdk@15'], condition: '@angular/material detected' },
     ],
   },
 
@@ -272,6 +287,7 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
     automatedFixes: 0,
     manualActions: [
       'Run: ng update @angular/core@16 @angular/cli@16',
+      'Run: ng update @angular/cdk@16 @angular/material@16 (if used)',
       'Migrate class-based guards to functional guards',
       'Remove ngcc postinstall script from package.json if present',
     ],
@@ -284,6 +300,9 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'typescript@~5.0.0',
       'rxjs@~7.8.0',
       'zone.js@~0.13.0',
+    ],
+    conditionalNpmInstall: [
+      { packages: ['@angular/material@16', '@angular/cdk@16'], condition: '@angular/material detected' },
     ],
   },
 
@@ -357,6 +376,9 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'rxjs@~7.8.0',
       'zone.js@~0.14.0',
     ],
+    conditionalNpmInstall: [
+      { packages: ['@angular/material@17', '@angular/cdk@17'], condition: '@angular/material detected' },
+    ],
   },
 
   '17-18': {
@@ -399,6 +421,9 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'typescript@~5.4.0',
       'rxjs@~7.8.0',
       'zone.js@~0.14.0',
+    ],
+    conditionalNpmInstall: [
+      { packages: ['@angular/material@18', '@angular/cdk@18'], condition: '@angular/material detected — Angular Material 18 includes stable Material 3 theme support' },
     ],
   },
 
@@ -459,6 +484,9 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'rxjs@~7.8.0',
       'zone.js@~0.15.0',
     ],
+    conditionalNpmInstall: [
+      { packages: ['@angular/material@19', '@angular/cdk@19'], condition: '@angular/material detected' },
+    ],
   },
 
   '19-20': {
@@ -509,6 +537,9 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       'typescript@~5.8.0',
       'rxjs@~7.8.0',
       'zone.js@~0.15.0',
+    ],
+    conditionalNpmInstall: [
+      { packages: ['@angular/material@20', '@angular/cdk@20'], condition: '@angular/material detected' },
     ],
   },
 };
