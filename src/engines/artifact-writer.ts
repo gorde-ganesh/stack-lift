@@ -4,12 +4,16 @@ import type { UpgradeReport, ArtifactFormat } from '../types/index.js';
 import {
   generateMarkdownReport,
   generateJsonReport,
+  generateAnalysisJson,
+  generateExecutionJson,
   generateFindingsJson,
   generatePlanJson,
+  generateValidationJson,
+  type SerializeOptions,
 } from './doc-generator.js';
 
 export interface ArtifactResult {
-  format: ArtifactFormat | 'findings' | 'plan' | 'session';
+  format: ArtifactFormat | 'analysis' | 'execution' | 'findings' | 'plan' | 'session' | 'validation';
   filePath: string;
 }
 
@@ -43,22 +47,35 @@ export function writeArtifacts(
   return results;
 }
 
-/**
- * Write the complete set of machine-readable artifacts: findings.json, plan.json.
- * Always written alongside the standard report artifacts.
- */
-export function writeMachineArtifacts(report: UpgradeReport, outputDir: string): ArtifactResult[] {
+export function writeMachineArtifacts(
+  report: UpgradeReport,
+  outputDir: string,
+  opts?: SerializeOptions,
+): ArtifactResult[] {
   fs.mkdirSync(outputDir, { recursive: true });
 
   const results: ArtifactResult[] = [];
 
-  const findingsPath = path.join(outputDir, 'findings.json');
-  fs.writeFileSync(findingsPath, generateFindingsJson(report), 'utf-8');
-  results.push({ format: 'findings', filePath: findingsPath });
+  const analysisPath = path.join(outputDir, 'analysis.json');
+  fs.writeFileSync(analysisPath, generateAnalysisJson(report, opts), 'utf-8');
+  results.push({ format: 'analysis', filePath: analysisPath });
 
   const planPath = path.join(outputDir, 'plan.json');
-  fs.writeFileSync(planPath, generatePlanJson(report), 'utf-8');
+  fs.writeFileSync(planPath, generatePlanJson(report, opts), 'utf-8');
   results.push({ format: 'plan', filePath: planPath });
+
+  const executionPath = path.join(outputDir, 'execution.json');
+  fs.writeFileSync(executionPath, generateExecutionJson(report, opts), 'utf-8');
+  results.push({ format: 'execution', filePath: executionPath });
+
+  const validationPath = path.join(outputDir, 'validation.json');
+  fs.writeFileSync(validationPath, generateValidationJson(report, opts), 'utf-8');
+  results.push({ format: 'validation', filePath: validationPath });
+
+  // Keep findings.json for backward compatibility
+  const findingsPath = path.join(outputDir, 'findings.json');
+  fs.writeFileSync(findingsPath, generateFindingsJson(report, opts), 'utf-8');
+  results.push({ format: 'findings', filePath: findingsPath });
 
   return results;
 }

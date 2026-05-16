@@ -91,15 +91,18 @@ describe('runInteractive — non-interactive mode', () => {
     expect(files.some(f => f.endsWith('.json'))).toBe(true);
   });
 
-  it('always writes findings.json and plan.json in non-interactive mode', async () => {
+  it('always writes machine artifacts in non-interactive mode', async () => {
     const { runInteractive } = await import('../src/engines/interaction.js');
     const outDir = path.join(tmpDir, 'machine-out');
     await runInteractive(tmpDir, {
       nonInteractive: true,
       options: { target: '13', outputFormats: ['markdown'], outputDir: outDir },
     });
-    expect(fs.existsSync(path.join(outDir, 'findings.json'))).toBe(true);
+    expect(fs.existsSync(path.join(outDir, 'analysis.json'))).toBe(true);
     expect(fs.existsSync(path.join(outDir, 'plan.json'))).toBe(true);
+    expect(fs.existsSync(path.join(outDir, 'execution.json'))).toBe(true);
+    expect(fs.existsSync(path.join(outDir, 'validation.json'))).toBe(true);
+    expect(fs.existsSync(path.join(outDir, 'findings.json'))).toBe(true);
   });
 
   it('report contains plan with correct hop', async () => {

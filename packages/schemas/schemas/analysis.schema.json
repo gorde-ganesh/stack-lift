@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stack-lift.dev/schemas/analysis.schema.json",
+  "title": "StackLift Analysis",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAt", "project", "summary", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "project": {
+      "type": "object",
+      "required": ["framework", "version", "packageManager"],
+      "additionalProperties": true,
+      "properties": {
+        "framework": { "type": "string" },
+        "lockfileParsed": { "type": "boolean" },
+        "packageManager": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["codeIssues", "deprecated", "outdated", "peerConflicts", "totalFindings"],
+      "additionalProperties": false,
+      "properties": {
+        "codeIssues": { "type": "integer", "minimum": 0 },
+        "deprecated": { "type": "integer", "minimum": 0 },
+        "outdated": { "type": "integer", "minimum": 0 },
+        "peerConflicts": { "type": "integer", "minimum": 0 },
+        "totalFindings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "additionalProperties": true,
+        "properties": {
+          "type": { "type": "string" }
+        }
+      }
+    }
+  }
+}

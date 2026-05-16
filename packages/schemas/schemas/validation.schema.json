@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stack-lift.dev/schemas/validation.schema.json",
+  "title": "StackLift Validation",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAt", "project", "summary", "postMigration"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "project": {
+      "type": "object",
+      "required": ["framework", "targetVersion", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "framework": { "type": "string" },
+        "targetVersion": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["failed", "passed", "regressions", "skipped", "totalSteps"],
+      "additionalProperties": false,
+      "properties": {
+        "failed": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "regressions": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "totalSteps": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "baseline": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "required": ["status", "step"],
+        "additionalProperties": true,
+        "properties": {
+          "durationMs": { "type": "number" },
+          "error": { "type": "string" },
+          "status": { "enum": ["failed", "skipped", "success"] },
+          "step": { "type": "string" }
+        }
+      }
+    },
+    "postMigration": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["status", "step"],
+        "additionalProperties": true,
+        "properties": {
+          "durationMs": { "type": "number" },
+          "error": { "type": "string" },
+          "status": { "enum": ["failed", "skipped", "success"] },
+          "step": { "type": "string" }
+        }
+      }
+    },
+    "regressions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

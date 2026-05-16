@@ -161,7 +161,7 @@ function printTerminalReport(report: UpgradeReport) {
 
 async function runAudit(
   projectPath: string,
-  options: { json?: boolean; markdown?: boolean; outDir?: string },
+  options: { json?: boolean; markdown?: boolean; stable?: boolean; outDir?: string },
 ) {
   const spinner = ora('Auditing project (read-only)…').start();
   try {
@@ -260,7 +260,7 @@ async function runAudit(
       if (options.markdown) formats.push('markdown');
       const outDir = path.resolve(resolved, options.outDir ?? './stacklift-output');
       const artifacts = writeArtifacts(report, outDir, formats);
-      const machineArtifacts = writeMachineArtifacts(report, outDir);
+      const machineArtifacts = writeMachineArtifacts(report, outDir, { omitTimestamp: options.stable });
       for (const a of [...artifacts, ...machineArtifacts]) {
         console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
       }
@@ -290,11 +290,12 @@ program
   )
   .option('--json', 'Write findings.json to output dir')
   .option('--markdown', 'Write markdown report to output dir')
+  .option('--stable', 'Suppress timestamps in machine artifacts for reproducible CI output')
   .option('--out-dir <dir>', 'Directory for artifact files', './stacklift-output')
   .action(
     async (
       projectPath: string,
-      options: { json?: boolean; markdown?: boolean; outDir?: string },
+      options: { json?: boolean; markdown?: boolean; stable?: boolean; outDir?: string },
     ) => {
       await runAudit(projectPath, options);
     },
@@ -446,6 +447,7 @@ program
   .option('--non-interactive', 'Skip prompts and generate plan with provided options', false)
   .option('--markdown', 'Write markdown report to output dir', false)
   .option('--json', 'Write JSON artifacts to output dir', false)
+  .option('--stable', 'Suppress timestamps in machine artifacts for reproducible CI output', false)
   .option('--out-dir <dir>', 'Directory for artifact files', './stacklift-output')
   .action(
     async (
@@ -456,6 +458,7 @@ program
         nonInteractive: boolean;
         markdown: boolean;
         json: boolean;
+        stable: boolean;
         outDir: string;
       },
     ) => {
@@ -504,7 +507,7 @@ program
           if (options.json) formats.push('json');
           const outDir = path.resolve(path.resolve(projectPath), options.outDir);
           const artifacts = writeArtifacts(report, outDir, formats);
-          const machineArtifacts = writeMachineArtifacts(report, outDir);
+          const machineArtifacts = writeMachineArtifacts(report, outDir, { omitTimestamp: options.stable });
           for (const a of [...artifacts, ...machineArtifacts]) {
             console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
           }

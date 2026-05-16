@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stack-lift.dev/schemas/execution.schema.json",
+  "title": "StackLift Execution",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAt", "project", "summary", "files"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "project": {
+      "type": "object",
+      "required": ["framework", "targetVersion", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "framework": { "type": "string" },
+        "targetVersion": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["applied", "filesModified", "filesScanned", "totalSuggestions"],
+      "additionalProperties": false,
+      "properties": {
+        "applied": { "type": "integer", "minimum": 0 },
+        "filesModified": { "type": "integer", "minimum": 0 },
+        "filesScanned": { "type": "integer", "minimum": 0 },
+        "totalSuggestions": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "suggestions"],
+        "additionalProperties": true,
+        "properties": {
+          "applied": { "type": "array", "items": { "type": "string" } },
+          "file": { "type": "string" },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["api", "automated", "description", "severity"],
+              "additionalProperties": true,
+              "properties": {
+                "api": { "type": "string" },
+                "automated": { "type": "boolean" },
+                "confidence": { "type": "string" },
+                "description": { "type": "string" },
+                "line": { "type": ["integer", "null"] },
+                "severity": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

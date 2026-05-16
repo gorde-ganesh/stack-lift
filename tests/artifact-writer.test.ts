@@ -96,12 +96,12 @@ describe('writeArtifacts', () => {
 });
 
 describe('writeMachineArtifacts', () => {
-  it('writes findings.json', () => {
+  it('writes analysis.json', () => {
     const results = writeMachineArtifacts(makeReport(), tmpDir);
-    const findingsResult = results.find(r => r.format === 'findings');
-    expect(findingsResult).toBeDefined();
-    expect(fs.existsSync(findingsResult!.filePath)).toBe(true);
-    const raw = fs.readFileSync(findingsResult!.filePath, 'utf-8');
+    const analysisResult = results.find(r => r.format === 'analysis');
+    expect(analysisResult).toBeDefined();
+    expect(fs.existsSync(analysisResult!.filePath)).toBe(true);
+    const raw = fs.readFileSync(analysisResult!.filePath, 'utf-8');
     const parsed = JSON.parse(raw) as { schemaVersion: string; findings: unknown[] };
     expect(parsed.schemaVersion).toBe('1.0');
     expect(Array.isArray(parsed.findings)).toBe(true);
@@ -118,19 +118,50 @@ describe('writeMachineArtifacts', () => {
     expect(Array.isArray(parsed.steps)).toBe(true);
   });
 
-  it('findings.json includes deprecated package finding', () => {
+  it('writes execution.json', () => {
     const results = writeMachineArtifacts(makeReport(), tmpDir);
-    const findingsResult = results.find(r => r.format === 'findings')!;
-    const raw = fs.readFileSync(findingsResult.filePath, 'utf-8');
+    const execResult = results.find(r => r.format === 'execution');
+    expect(execResult).toBeDefined();
+    expect(fs.existsSync(execResult!.filePath)).toBe(true);
+    const raw = fs.readFileSync(execResult!.filePath, 'utf-8');
+    const parsed = JSON.parse(raw) as { schemaVersion: string; files: unknown[]; summary: { filesScanned: number } };
+    expect(parsed.schemaVersion).toBe('1.0');
+    expect(Array.isArray(parsed.files)).toBe(true);
+    expect(typeof parsed.summary.filesScanned).toBe('number');
+  });
+
+  it('writes validation.json', () => {
+    const results = writeMachineArtifacts(makeReport(), tmpDir);
+    const valResult = results.find(r => r.format === 'validation');
+    expect(valResult).toBeDefined();
+    expect(fs.existsSync(valResult!.filePath)).toBe(true);
+    const raw = fs.readFileSync(valResult!.filePath, 'utf-8');
+    const parsed = JSON.parse(raw) as { schemaVersion: string; postMigration: unknown[]; regressions: unknown[] };
+    expect(parsed.schemaVersion).toBe('1.0');
+    expect(Array.isArray(parsed.postMigration)).toBe(true);
+    expect(Array.isArray(parsed.regressions)).toBe(true);
+  });
+
+  it('keeps findings.json for backward compatibility', () => {
+    const results = writeMachineArtifacts(makeReport(), tmpDir);
+    const findingsResult = results.find(r => r.format === 'findings');
+    expect(findingsResult).toBeDefined();
+    expect(fs.existsSync(findingsResult!.filePath)).toBe(true);
+  });
+
+  it('analysis.json includes deprecated package finding', () => {
+    const results = writeMachineArtifacts(makeReport(), tmpDir);
+    const analysisResult = results.find(r => r.format === 'analysis')!;
+    const raw = fs.readFileSync(analysisResult.filePath, 'utf-8');
     const parsed = JSON.parse(raw) as { findings: Array<{ package: string }> };
     const momentFinding = parsed.findings.find(f => f.package === 'moment');
     expect(momentFinding).toBeDefined();
   });
 
-  it('findings.json summary counts match actual findings', () => {
+  it('analysis.json summary counts match actual findings', () => {
     const results = writeMachineArtifacts(makeReport(), tmpDir);
-    const findingsResult = results.find(r => r.format === 'findings')!;
-    const raw = fs.readFileSync(findingsResult.filePath, 'utf-8');
+    const analysisResult = results.find(r => r.format === 'analysis')!;
+    const raw = fs.readFileSync(analysisResult.filePath, 'utf-8');
     const parsed = JSON.parse(raw) as {
       findings: unknown[];
       summary: { totalFindings: number; deprecated: number };
@@ -139,11 +170,46 @@ describe('writeMachineArtifacts', () => {
     expect(parsed.summary.deprecated).toBe(1);
   });
 
-  it('plan.json includes step details', () => {
+  it('analysis.json findings are sorted deterministically', () => {
+    const results = writeMachineArtifacts(makeReport(), tmpDir);
+    const analysisResult = results.find(r => r.format === 'analysis')!;
+    const raw = fs.readFileSync(analysisResult.filePath, 'utf-8');
+    const parsed = JSON.parse(raw) as { findings: Array<{ type: string }> };
+    const types = parsed.findings.map(f => f.type);
+    expect(types).toEqual([...types].sort());
+  });
+
+  it('plan.json object keys are sorted alphabetically', () => {
     const results = writeMachineArtifacts(makeReport(), tmpDir);
     const planResult = results.find(r => r.format === 'plan')!;
     const raw = fs.readFileSync(planResult.filePath, 'utf-8');
     const parsed = JSON.parse(raw) as { steps: Array<{ fromVersion: string }> };
     expect(parsed.steps[0].fromVersion).toBe('12');
+    const keys = Object.keys(parsed);
+    expect(keys).toEqual([...keys].sort());
+  });
+
+  it('validation.json regressions lists only newly-failed steps', () => {
+    const results = writeMachineArtifacts(makeReport(), tmpDir);
+    const valResult = results.find(r => r.format === 'validation')!;
+    const raw = fs.readFileSync(valResult.filePath, 'utf-8');
+    const parsed = JSON.parse(raw) as { regressions: string[] };
+    expect(Array.isArray(parsed.regressions)).toBe(true);
+  });
+
+  it('stable mode produces reproducible output with fixed timestamp', () => {
+    const report = makeReport();
+    const results1 = writeMachineArtifacts(report, tmpDir, { omitTimestamp: true });
+    const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-lift-stable-'));
+    try {
+      const results2 = writeMachineArtifacts(report, dir2, { omitTimestamp: true });
+      const r1 = results1.find(r => r.format === 'analysis')!;
+      const r2 = results2.find(r => r.format === 'analysis')!;
+      expect(fs.readFileSync(r1.filePath, 'utf-8')).toBe(fs.readFileSync(r2.filePath, 'utf-8'));
+      const parsed = JSON.parse(fs.readFileSync(r1.filePath, 'utf-8')) as { generatedAt: string };
+      expect(parsed.generatedAt).toBe('1970-01-01T00:00:00.000Z');
+    } finally {
+      fs.rmSync(dir2, { recursive: true, force: true });
+    }
   });
 });

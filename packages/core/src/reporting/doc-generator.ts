@@ -344,103 +344,257 @@ export function generateJsonReport(report: UpgradeReport): string {
   return JSON.stringify(report, null, 2);
 }
 
-export function generateFindingsJson(report: UpgradeReport): string {
-  const findings = [
+export const STABLE_TIMESTAMP = '1970-01-01T00:00:00.000Z';
+
+export interface SerializeOptions {
+  omitTimestamp?: boolean;
+}
+
+function stableStringify(value: unknown, indent = 2): string {
+  function sortKeys(_key: string, val: unknown): unknown {
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      return Object.fromEntries(
+        Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)),
+      );
+    }
+    return val;
+  }
+  return JSON.stringify(value, sortKeys, indent);
+}
+
+function resolveTimestamp(report: UpgradeReport, opts?: SerializeOptions): string {
+  return opts?.omitTimestamp ? STABLE_TIMESTAMP : report.generatedAt;
+}
+
+function buildFindingsList(report: UpgradeReport) {
+  return [
     ...report.outdatedDependencies.map((d) => ({
-      type: d.deprecated ? 'deprecated_package' : 'outdated_package',
-      package: d.name,
-      current: d.current,
-      latest: d.latest,
-      riskLevel: d.risk,
-      riskCategory: d.riskCategory ?? (d.deprecated ? 'deprecated' : 'breaking-compatibility'),
+      api: undefined,
+      automated: undefined,
       confidence: d.confidence,
-      source: d.observedIn ?? 'package.json',
+      current: d.current,
+      description: undefined,
       evidence: d.latestSource === 'registry' ? 'npm registry query' : 'static knowledge base',
+      file: undefined,
+      latest: d.latest,
+      line: undefined,
+      package: d.name,
       reason: d.reason ?? null,
+      riskCategory: d.riskCategory ?? (d.deprecated ? 'deprecated' : 'breaking-compatibility'),
+      riskLevel: d.risk,
+      severity: undefined,
+      source: d.observedIn ?? 'package.json',
+      type: d.deprecated ? 'deprecated_package' : 'outdated_package',
     })),
     ...report.peerConflicts.map((c) => ({
-      type: 'peer_conflict',
-      package: c.package,
-      installedVersion: c.installedVersion,
-      requiredRange: c.requiredRange,
-      requiredBy: c.requiredBy,
-      unresolvable: c.unresolvable,
-      confidence: 'high',
-      source: 'package.json + lockfile',
+      confidence: 'high' as const,
       evidence: 'semver peer constraint check',
+      installedVersion: c.installedVersion,
+      package: c.package,
+      requiredBy: c.requiredBy,
+      requiredRange: c.requiredRange,
+      source: 'package.json + lockfile',
+      type: 'peer_conflict',
+      unresolvable: c.unresolvable,
     })),
     ...report.refactorResults.flatMap((r) =>
       r.suggestions.map((s) => ({
-        type: 'code_issue',
+        api: s.change.api,
+        automated: s.change.automated,
+        confidence: s.change.confidence ?? 'medium',
+        description: s.change.description,
+        evidence: 'source pattern scan',
         file: r.file,
         line: s.line ?? null,
-        api: s.change.api,
-        description: s.change.description,
-        automated: s.change.automated,
         severity: s.change.severity,
-        confidence: s.change.confidence ?? 'medium',
         source: r.file,
-        evidence: 'source pattern scan',
+        type: 'code_issue',
       })),
     ),
-  ];
-
-  return JSON.stringify(
-    {
-      schemaVersion: SCHEMA_VERSION,
-      generatedAt: report.generatedAt,
-      project: {
-        framework: report.stack.framework,
-        version: report.stack.frameworkVersion,
-        packageManager: report.stack.packageManager,
-        lockfileParsed: report.stack.lockfileParsed,
-      },
-      summary: {
-        totalFindings: findings.length,
-        deprecated: report.outdatedDependencies.filter((d) => d.deprecated).length,
-        outdated: report.outdatedDependencies.filter((d) => !d.deprecated).length,
-        peerConflicts: report.peerConflicts.length,
-        codeIssues: report.refactorResults.flatMap((r) => r.suggestions).length,
-      },
-      findings,
-    },
-    null,
-    2,
-  );
+  ]
+    .map((f) => Object.fromEntries(Object.entries(f).filter(([, v]) => v !== undefined)))
+    .sort((a, b) => {
+      const typeOrder = (a['type'] as string).localeCompare(b['type'] as string);
+      if (typeOrder !== 0) return typeOrder;
+      const aKey = ((a['package'] ?? a['file'] ?? '') as string);
+      const bKey = ((b['package'] ?? b['file'] ?? '') as string);
+      return aKey.localeCompare(bKey);
+    });
 }
 
-export function generatePlanJson(report: UpgradeReport): string {
-  return JSON.stringify(
-    {
-      schemaVersion: SCHEMA_VERSION,
-      generatedAt: report.generatedAt,
+export function generateFindingsJson(report: UpgradeReport, opts?: SerializeOptions): string {
+  const findings = buildFindingsList(report);
+
+  return stableStringify({
+    findings,
+    generatedAt: resolveTimestamp(report, opts),
+    project: {
       framework: report.stack.framework,
-      fromVersion: report.plan.fromVersion,
-      toVersion: report.plan.toVersion,
-      strategy: report.plan.strategy,
-      riskLevel: report.plan.riskLevel,
-      estimatedEffort: report.plan.estimatedEffort,
-      effortBasis: report.plan.effortBasis,
-      decisions: report.decisions ?? null,
-      steps: report.plan.steps.map((s) => ({
-        fromVersion: s.fromVersion,
-        toVersion: s.toVersion,
-        description: s.description,
-        referenceUrl: s.referenceUrl ?? null,
-        npmInstall: s.npmInstall,
-        manualActions: s.manualActions,
-        breakingChanges: s.breakingChanges.map((c) => ({
-          api: c.api,
-          description: c.description,
-          automated: c.automated,
-          severity: c.severity,
-          confidence: c.confidence,
-          category: c.category,
-        })),
-      })),
-      buildValidation: report.buildValidation ?? null,
+      lockfileParsed: report.stack.lockfileParsed,
+      packageManager: report.stack.packageManager,
+      version: report.stack.frameworkVersion,
     },
-    null,
-    2,
-  );
+    schemaVersion: SCHEMA_VERSION,
+    summary: {
+      codeIssues: report.refactorResults.flatMap((r) => r.suggestions).length,
+      deprecated: report.outdatedDependencies.filter((d) => d.deprecated).length,
+      outdated: report.outdatedDependencies.filter((d) => !d.deprecated).length,
+      peerConflicts: report.peerConflicts.length,
+      totalFindings: findings.length,
+    },
+  });
+}
+
+export function generateAnalysisJson(report: UpgradeReport, opts?: SerializeOptions): string {
+  const findings = buildFindingsList(report);
+
+  return stableStringify({
+    findings,
+    generatedAt: resolveTimestamp(report, opts),
+    project: {
+      framework: report.stack.framework,
+      lockfileParsed: report.stack.lockfileParsed,
+      packageManager: report.stack.packageManager,
+      version: report.stack.frameworkVersion,
+    },
+    schemaVersion: SCHEMA_VERSION,
+    summary: {
+      codeIssues: report.refactorResults.flatMap((r) => r.suggestions).length,
+      deprecated: report.outdatedDependencies.filter((d) => d.deprecated).length,
+      outdated: report.outdatedDependencies.filter((d) => !d.deprecated).length,
+      peerConflicts: report.peerConflicts.length,
+      totalFindings: findings.length,
+    },
+  });
+}
+
+export function generateExecutionJson(report: UpgradeReport, opts?: SerializeOptions): string {
+  const files = [...report.refactorResults]
+    .sort((a, b) => a.file.localeCompare(b.file))
+    .map((r) => ({
+      applied: r.applied ?? [],
+      file: r.file,
+      suggestions: [...r.suggestions]
+        .sort((a, b) => (a.change.api ?? '').localeCompare(b.change.api ?? ''))
+        .map((s) => ({
+          api: s.change.api,
+          automated: s.change.automated,
+          confidence: s.change.confidence ?? 'medium',
+          description: s.change.description,
+          line: s.line ?? null,
+          severity: s.change.severity,
+        })),
+    }));
+
+  const totalSuggestions = files.reduce((n, f) => n + f.suggestions.length, 0);
+  const filesModified = files.filter((f) => f.applied.length > 0).length;
+  const applied = files.reduce((n, f) => n + f.applied.length, 0);
+
+  return stableStringify({
+    files,
+    generatedAt: resolveTimestamp(report, opts),
+    project: {
+      framework: report.stack.framework,
+      targetVersion: report.plan.toVersion,
+      version: report.stack.frameworkVersion,
+    },
+    schemaVersion: SCHEMA_VERSION,
+    summary: {
+      applied,
+      filesModified,
+      filesScanned: files.length,
+      totalSuggestions,
+    },
+  });
+}
+
+export function generateValidationJson(report: UpgradeReport, opts?: SerializeOptions): string {
+  const stepOrder = ['install', 'build', 'test', 'lint'];
+  const sortSteps = (steps: BuildValidationResult[]) =>
+    [...steps].sort(
+      (a, b) => stepOrder.indexOf(a.step) - stepOrder.indexOf(b.step),
+    );
+
+  const postMigration = sortSteps(report.buildValidation ?? []).map((r) => ({
+    durationMs: r.durationMs ?? null,
+    error: r.error ?? null,
+    status: r.status,
+    step: r.step,
+  }));
+
+  const baseline = report.baselineValidation
+    ? sortSteps(report.baselineValidation).map((r) => ({
+        durationMs: r.durationMs ?? null,
+        error: r.error ?? null,
+        status: r.status,
+        step: r.step,
+      }))
+    : null;
+
+  const regressions = postMigration
+    .filter((r) => {
+      if (r.status !== 'failed') return false;
+      const base = baseline?.find((b) => b.step === r.step);
+      return !base || base.status !== 'failed';
+    })
+    .map((r) => r.step)
+    .sort();
+
+  const passed = postMigration.filter((r) => r.status === 'success').length;
+  const failed = postMigration.filter((r) => r.status === 'failed').length;
+  const skipped = postMigration.filter((r) => r.status === 'skipped').length;
+
+  return stableStringify({
+    baseline,
+    generatedAt: resolveTimestamp(report, opts),
+    postMigration,
+    project: {
+      framework: report.stack.framework,
+      targetVersion: report.plan.toVersion,
+      version: report.stack.frameworkVersion,
+    },
+    regressions,
+    schemaVersion: SCHEMA_VERSION,
+    summary: {
+      failed,
+      passed,
+      regressions: regressions.length,
+      skipped,
+      totalSteps: postMigration.length,
+    },
+  });
+}
+
+export function generatePlanJson(report: UpgradeReport, opts?: SerializeOptions): string {
+  return stableStringify({
+    buildValidation: report.buildValidation ?? null,
+    decisions: report.decisions ?? null,
+    effortBasis: report.plan.effortBasis,
+    estimatedEffort: report.plan.estimatedEffort,
+    framework: report.stack.framework,
+    fromVersion: report.plan.fromVersion,
+    generatedAt: resolveTimestamp(report, opts),
+    riskLevel: report.plan.riskLevel,
+    schemaVersion: SCHEMA_VERSION,
+    steps: report.plan.steps.map((s) => ({
+      breakingChanges: [...s.breakingChanges]
+        .sort((a, b) => a.api.localeCompare(b.api))
+        .map((c) => ({
+          api: c.api,
+          automated: c.automated,
+          category: c.category,
+          confidence: c.confidence,
+          description: c.description,
+          severity: c.severity,
+        })),
+      description: s.description,
+      fromVersion: s.fromVersion,
+      manualActions: s.manualActions,
+      npmInstall: s.npmInstall,
+      referenceUrl: s.referenceUrl ?? null,
+      toVersion: s.toVersion,
+    })),
+    strategy: report.plan.strategy,
+    toVersion: report.plan.toVersion,
+  });
 }

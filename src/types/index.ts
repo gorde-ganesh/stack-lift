@@ -252,6 +252,8 @@ export interface NonInteractiveOptions {
   outputFormats?: ArtifactFormat[];
   outputDir?: string;
   validate?: boolean;
+  /** When true, suppress timestamps in machine artifacts for reproducible CI output. */
+  stable?: boolean;
 }
 
 export interface UpgradeReport {

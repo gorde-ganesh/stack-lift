@@ -38,8 +38,13 @@ export { validateBuild } from './validation/build-validator.js';
 export {
   generateMarkdownReport,
   generateJsonReport,
+  generateAnalysisJson,
+  generateExecutionJson,
   generateFindingsJson,
   generatePlanJson,
+  generateValidationJson,
+  STABLE_TIMESTAMP,
+  type SerializeOptions,
 } from './reporting/doc-generator.js';
 export { writeArtifacts, writeMachineArtifacts } from './reporting/artifact-writer.js';
 
