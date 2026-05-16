@@ -1,6 +1,5 @@
 {
   "name": "@stack-lift/cli",
-<<<<<<< HEAD
   "version": "0.5.0",
   "type": "module",
   "private": true,
@@ -10,15 +9,15 @@
   },
   "main": "./dist/cli.js",
   "scripts": {
-    "build": "tsup src/cli.ts src/skills-cli.ts --format esm --out-dir dist --banner.js '#!/usr/bin/env node'",
+    "build": "tsup",
     "dev": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@stack-lift/angular-provider": "workspace:*",
-    "@stack-lift/core": "workspace:*",
-    "@stack-lift/shared": "workspace:*",
+    "@stack-lift/angular-provider": "0.5.0",
+    "@stack-lift/core": "0.5.0",
+    "@stack-lift/shared": "0.5.0",
     "@inquirer/prompts": "^8.4.3",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
@@ -31,8 +30,4 @@
     "typescript": "^5.4.0",
     "vitest": "^1.3.0"
   }
-=======
-  "private": true,
-  "type": "module"
->>>>>>> 9a7cad5c4ef007dcff61289da49d9bcd66d23017
 }

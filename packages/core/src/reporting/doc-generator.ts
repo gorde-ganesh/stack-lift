@@ -5,6 +5,7 @@ import type {
   PeerDepConflict,
   BuildValidationResult,
 } from '@stack-lift/shared';
+import { SCHEMA_VERSION } from '@stack-lift/schemas';
 
 const RISK_EMOJI: Record<string, string> = {
   critical: '🔴',
@@ -386,7 +387,7 @@ export function generateFindingsJson(report: UpgradeReport): string {
 
   return JSON.stringify(
     {
-      schemaVersion: '1.0',
+      schemaVersion: SCHEMA_VERSION,
       generatedAt: report.generatedAt,
       project: {
         framework: report.stack.framework,
@@ -411,7 +412,7 @@ export function generateFindingsJson(report: UpgradeReport): string {
 export function generatePlanJson(report: UpgradeReport): string {
   return JSON.stringify(
     {
-      schemaVersion: '1.0',
+      schemaVersion: SCHEMA_VERSION,
       generatedAt: report.generatedAt,
       framework: report.stack.framework,
       fromVersion: report.plan.fromVersion,

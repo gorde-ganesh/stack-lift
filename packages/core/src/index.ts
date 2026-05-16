@@ -46,12 +46,15 @@ export { writeArtifacts, writeMachineArtifacts } from './reporting/artifact-writ
 // Path safety
 export { assertSafePath, resolveSafePath } from './path-guard.js';
 
-// Knowledge (re-exported for consumers that need version data)
+// Provider API
+export type { FrameworkProvider } from './providers/framework-provider.js';
 export {
-  getAngularUpgradeSteps,
-  getAngularLatestVersion,
-  ANGULAR_SUPPORTED_VERSIONS,
-} from './knowledge/angular.js';
+  registerFrameworkProvider,
+  getFrameworkProvider,
+  listFrameworkProviders,
+} from './providers/registry.js';
+
+// Generic knowledge (re-exported for consumers that need version data)
 export {
   getReactUpgradeSteps,
   getReactLatestVersion,

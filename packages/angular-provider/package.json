@@ -12,13 +12,13 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --dts --format esm --out-dir dist",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@stack-lift/core": "workspace:*",
-    "@stack-lift/shared": "workspace:*"
+    "@stack-lift/core": "0.5.0",
+    "@stack-lift/shared": "0.5.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

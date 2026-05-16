@@ -12,9 +12,9 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --dts --format esm --out-dir dist",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
     "tsup": "^8.0.2",

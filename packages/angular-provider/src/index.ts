@@ -1,3 +1,23 @@
-// Stub — Angular provider implementation arrives in PR 4 (FrameworkProvider interface).
-// PR 3 keeps all Angular knowledge in @stack-lift/core/knowledge/angular.
-export {};
+import { registerFrameworkProvider, type FrameworkProvider } from '@stack-lift/core';
+import {
+  ANGULAR_SUPPORTED_VERSIONS,
+  getAngularLatestVersion,
+  getAngularUpgradeSteps,
+} from './angular.js';
+
+export {
+  ANGULAR_SUPPORTED_VERSIONS,
+  getAngularLatestVersion,
+  getAngularUpgradeSteps,
+} from './angular.js';
+
+export const angularProvider: FrameworkProvider = {
+  framework: 'Angular',
+  supportedVersions: ANGULAR_SUPPORTED_VERSIONS,
+  latestVersion: getAngularLatestVersion,
+  upgradeSteps: getAngularUpgradeSteps,
+};
+
+export function registerAngularProvider(): void {
+  registerFrameworkProvider(angularProvider);
+}
