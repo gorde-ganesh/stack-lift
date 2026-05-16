@@ -21,7 +21,9 @@ import {
   getReactLatestVersion,
   validateBuild,
   RollbackManager,
+  executeCommands,
 } from '@stack-lift/core';
+import type { ExecuteCommandsResult } from '@stack-lift/core';
 import {
   ANGULAR_SUPPORTED_VERSIONS,
   getAngularLatestVersion,
@@ -35,9 +37,12 @@ import type {
   ArtifactFormat,
   PackageReplacement,
   UpgradeReport,
+  UpgradePlan,
   NonInteractiveOptions,
   BuildValidationResult,
   ExecutionMode,
+  PackageManager,
+  CommandExecutionRecord,
 } from '@stack-lift/shared';
 import { execSync } from 'node:child_process';
 
@@ -366,6 +371,46 @@ async function askOutputDir(nonInteractive: boolean, defaultDir?: string): Promi
     message: 'Output directory',
     default: defaultDir ?? './stacklift-output',
   });
+}
+
+// ── Upgrade command builder ───────────────────────────────────────────────────
+
+function buildUpgradeCommands(plan: UpgradePlan, packageManager: PackageManager): string[] {
+  const cmds: string[] = [];
+
+  const installSync: Record<PackageManager, string> = {
+    npm: 'npm install',
+    yarn: 'yarn install',
+    pnpm: 'pnpm install',
+    bun: 'bun install',
+  };
+
+  const addPkg = (packages: string): string => {
+    const map: Record<PackageManager, string> = {
+      npm: `npm install ${packages}`,
+      yarn: `yarn add ${packages}`,
+      pnpm: `pnpm add ${packages}`,
+      bun: `bun add ${packages}`,
+    };
+    return map[packageManager];
+  };
+
+  for (const step of plan.steps) {
+    if (step.npmInstall.length === 0) continue;
+    const pkgList = step.npmInstall.join(' ');
+
+    if (plan.framework === 'Angular') {
+      // ng update handles migrations/schematics; --allow-dirty lets it run with AST fix changes.
+      cmds.push(`npx ng update ${pkgList} --allow-dirty --force`);
+    } else {
+      cmds.push(addPkg(pkgList));
+    }
+  }
+
+  // Always sync the lockfile after version bumps.
+  cmds.push(installSync[packageManager]);
+
+  return cmds;
 }
 
 // ── Git safety ────────────────────────────────────────────────────────────────
@@ -751,7 +796,7 @@ export async function runInteractive(
   if (effectiveValidate && !isDryRun) {
     const baseSpinner = ora('Running baseline build validation (before migration)…').start();
     try {
-      baselineValidation = validateBuild({
+      baselineValidation = await validateBuild({
         projectPath: resolved,
         packageManager: stack.packageManager,
         ...(stack.lockfileParsed !== undefined ? { lockfileParsed: stack.lockfileParsed } : {}),
@@ -840,6 +885,44 @@ export async function runInteractive(
       }
     }
 
+    // ── Execute upgrade commands (autonomous mode) ─────────────────────────────
+    let cmdExecResult: ExecuteCommandsResult | undefined;
+    if (isAutonomous && !isDryRun) {
+      const upgradeCommands = buildUpgradeCommands(plan, stack.packageManager);
+      if (upgradeCommands.length > 0) {
+        const execSpinner = ora(`Executing ${upgradeCommands.length} upgrade command(s)…`).start();
+        cmdExecResult = await executeCommands({
+          projectPath: resolved,
+          commands: upgradeCommands,
+          skipBackup: true, // RollbackManager handles the branch-level backup
+          onOutput: (_cmd, _stream, chunk) => process.stdout.write(chunk),
+        });
+
+        if (cmdExecResult.status === 'success') {
+          execSpinner.succeed(`Upgrade commands completed (${upgradeCommands.length} command(s))`);
+        } else {
+          const lastExec = cmdExecResult.executions.at(-1);
+          const errPreview = (lastExec?.result.stderr || lastExec?.result.stdout || '').slice(
+            0,
+            200,
+          );
+          execSpinner.fail(`Upgrade command failed: ${errPreview.split('\n')[0]}`);
+          throw new Error(`Upgrade commands failed: ${errPreview}`);
+        }
+      }
+    }
+
+    const commandExecutions: CommandExecutionRecord[] | undefined = cmdExecResult?.executions.map(
+      (e) => ({
+        cmd: e.cmd,
+        exitCode: e.result.exitCode,
+        durationMs: e.result.durationMs,
+        stdoutSummary: e.result.stdout.slice(0, 500),
+        stderrSummary: e.result.stderr.slice(0, 500),
+        timedOut: e.result.timedOut,
+      }),
+    );
+
     const manualActions = [...new Set(plan.steps.flatMap((s) => s.manualActions))];
 
     const report: UpgradeReport = {
@@ -851,6 +934,8 @@ export async function runInteractive(
       manualActions,
       buildStatus: 'skipped',
       ...(baselineValidation ? { baselineValidation } : {}),
+      ...(commandExecutions ? { commandExecutions } : {}),
+      ...(cmdExecResult ? { commandExecutionStatus: cmdExecResult.status } : {}),
       decisions,
       generatedAt: new Date().toISOString(),
     };
@@ -859,7 +944,7 @@ export async function runInteractive(
     if (effectiveValidate && !isDryRun) {
       const valSpinner = ora('Running post-migration build validation…').start();
       try {
-        report.buildValidation = validateBuild({
+        report.buildValidation = await validateBuild({
           projectPath: resolved,
           packageManager: stack.packageManager,
           ...(stack.lockfileParsed !== undefined ? { lockfileParsed: stack.lockfileParsed } : {}),
@@ -920,7 +1005,7 @@ export async function runInteractive(
     return { report, decisions, artifacts };
   } catch (err) {
     if (rollbackManager) {
-      const rollbackResult = rollbackManager.rollback(isDryRun);
+      const rollbackResult = await rollbackManager.rollback(isDryRun);
       console.log('');
       if (rollbackResult.success) {
         console.log(chalk.yellow(`  ↩ Auto-rollback: ${rollbackResult.message}`));

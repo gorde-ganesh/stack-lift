@@ -247,6 +247,15 @@ export interface BuildValidationResult {
   error?: string;
 }
 
+export interface CommandExecutionRecord {
+  cmd: string;
+  exitCode: number;
+  durationMs: number;
+  stdoutSummary?: string;
+  stderrSummary?: string;
+  timedOut: boolean;
+}
+
 export interface NonInteractiveOptions {
   target?: string;
   objective?: MigrationObjective;
@@ -272,6 +281,9 @@ export interface UpgradeReport {
   buildValidation?: BuildValidationResult[];
   decisions?: Partial<MigrationDecisions>;
   generatedAt: string;
+  /** Command execution journal populated when running in autonomous mode. */
+  commandExecutions?: CommandExecutionRecord[];
+  commandExecutionStatus?: 'success' | 'failed' | 'rolled-back' | 'dry-run';
 }
 
 export interface AnalyzeOptions {

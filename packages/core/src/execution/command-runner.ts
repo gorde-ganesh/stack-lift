@@ -43,6 +43,8 @@ export interface ExecuteCommandsOptions {
   timeoutMs?: number;
   /** Called for each stdout/stderr chunk from each command. */
   onOutput?: (cmd: string, stream: 'stdout' | 'stderr', chunk: string) => void;
+  /** Skip the automatic git stash backup — use when the caller already manages rollback. */
+  skipBackup?: boolean;
 }
 
 export interface ExecuteCommandsResult {
@@ -155,12 +157,13 @@ export async function executeCommands(
     dryRun = false,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     onOutput,
+    skipBackup = false,
   } = options;
 
   const executions: CommandExecution[] = [];
 
   // Snapshot the repo state before any mutations so we can roll back cleanly.
-  const backupRef = dryRun ? undefined : await createGitBackup(projectPath);
+  const backupRef = dryRun || skipBackup ? undefined : await createGitBackup(projectPath);
 
   for (const cmd of commands) {
     const result = await runCommand(cmd, {

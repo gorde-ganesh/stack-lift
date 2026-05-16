@@ -1,6 +1,6 @@
-import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { runCommand } from '../execution/command-runner.js';
 import type { BuildValidationResult, PackageManager } from '@stack-lift/shared';
 
 const PM_CMDS: Record<
@@ -48,34 +48,34 @@ function hasScript(projectPath: string, name: string): boolean {
   }
 }
 
-function runStep(
+async function runStep(
   step: BuildValidationResult['step'],
   cmd: string,
   projectPath: string,
-): BuildValidationResult {
-  const start = Date.now();
-  try {
-    const output = execSync(cmd, {
-      cwd: projectPath,
-      stdio: 'pipe',
-      timeout: 5 * 60 * 1000,
-    }).toString();
+): Promise<BuildValidationResult> {
+  const result = await runCommand(cmd, {
+    cwd: projectPath,
+    timeoutMs: 5 * 60 * 1000,
+  });
+
+  if (result.exitCode === 0 && !result.timedOut) {
     return {
       step,
       status: 'success',
-      durationMs: Date.now() - start,
-      output: output.slice(0, 2000),
-    };
-  } catch (err: unknown) {
-    const e = err as { stdout?: Buffer; stderr?: Buffer; message?: string };
-    const combined = [e.stdout?.toString(), e.stderr?.toString()].filter(Boolean).join('\n');
-    return {
-      step,
-      status: 'failed',
-      durationMs: Date.now() - start,
-      error: (combined || e.message || String(err)).slice(0, 2000),
+      durationMs: result.durationMs,
+      output: result.stdout.slice(0, 2000),
     };
   }
+
+  const error = (result.stderr || result.stdout).slice(0, 2000);
+  return {
+    step,
+    status: 'failed',
+    durationMs: result.durationMs,
+    error: result.timedOut
+      ? `Timed out after ${Math.round(result.durationMs / 1000)}s. ${error}`
+      : error,
+  };
 }
 
 export interface ValidateOptions {
@@ -85,7 +85,7 @@ export interface ValidateOptions {
   steps?: Array<BuildValidationResult['step']>;
 }
 
-export function validateBuild(options: ValidateOptions): BuildValidationResult[] {
+export async function validateBuild(options: ValidateOptions): Promise<BuildValidationResult[]> {
   const {
     projectPath,
     packageManager,
@@ -104,7 +104,7 @@ export function validateBuild(options: ValidateOptions): BuildValidationResult[]
       }
     }
     const cmd = step === 'install' && lockfileParsed ? cmds.installImmutable : cmds[step];
-    results.push(runStep(step, cmd, projectPath));
+    results.push(await runStep(step, cmd, projectPath));
   }
 
   return results;

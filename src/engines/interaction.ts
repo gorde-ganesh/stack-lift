@@ -743,7 +743,7 @@ export async function runInteractive(
   if (effectiveValidate && !isDryRun) {
     const baseSpinner = ora('Running baseline build validation (before migration)…').start();
     try {
-      baselineValidation = validateBuild({
+      baselineValidation = await validateBuild({
         projectPath: resolved,
         packageManager: stack.packageManager,
         ...(stack.lockfileParsed !== undefined ? { lockfileParsed: stack.lockfileParsed } : {}),
@@ -851,7 +851,7 @@ export async function runInteractive(
     if (effectiveValidate && !isDryRun) {
       const valSpinner = ora('Running post-migration build validation…').start();
       try {
-        report.buildValidation = validateBuild({
+        report.buildValidation = await validateBuild({
           projectPath: resolved,
           packageManager: stack.packageManager,
           ...(stack.lockfileParsed !== undefined ? { lockfileParsed: stack.lockfileParsed } : {}),
@@ -912,7 +912,7 @@ export async function runInteractive(
     return { report, decisions, artifacts };
   } catch (err) {
     if (rollbackManager) {
-      const rollbackResult = rollbackManager.rollback(isDryRun);
+      const rollbackResult = await rollbackManager.rollback(isDryRun);
       console.log('');
       if (rollbackResult.success) {
         console.log(chalk.yellow(`  ↩ Auto-rollback: ${rollbackResult.message}`));

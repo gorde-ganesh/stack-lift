@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { runCommand } from './command-runner.js';
 
 export type RollbackStrategy = 'branch' | 'tag' | 'none';
 
@@ -22,14 +22,15 @@ interface BackupState {
  * Tracks a branch/tag-based git backup and can restore the project to its
  * pre-migration state on failure, or commit (mark as done) on success.
  *
- * Branch strategy  — rollback checks out the original branch and deletes the
- *                    upgrade branch.
- * Tag strategy     — rollback checks out the backup tag to restore the working tree.
+ * Branch strategy  — rollback resets the working tree, checks out the original
+ *                    branch, and deletes the upgrade branch.
+ * Tag strategy     — rollback hard-resets to the backup tag commit.
  *
  * No git commands run when:
  *  - no backup has been registered (setBackup was never called)
  *  - commit() was called (migration succeeded)
  *  - dryRun=true is passed to rollback()
+ *  - git is not available in the project directory
  */
 export class RollbackManager {
   private readonly projectPath: string;
@@ -56,7 +57,7 @@ export class RollbackManager {
   }
 
   /** Restore the project to its pre-migration state. */
-  rollback(dryRun = false): RollbackResult {
+  async rollback(dryRun = false): Promise<RollbackResult> {
     if (!this.state) {
       return {
         success: true,
@@ -79,30 +80,68 @@ export class RollbackManager {
       };
     }
 
+    // Verify git is available before attempting any git operations.
+    const gitCheck = await runCommand('git rev-parse --git-dir', { cwd: this.projectPath });
+    if (gitCheck.exitCode !== 0) {
+      return {
+        success: false,
+        strategy: this.state.strategy,
+        message: 'Not a git repository; cannot roll back automatically.',
+        recoveryInstructions: 'Restore your files manually from a backup.',
+      };
+    }
+
     const { strategy, backupRef, originalBranch } = this.state;
     try {
       if (strategy === 'branch') {
         const target = originalBranch ?? 'main';
-        this.exec(`git checkout ${target}`);
-        this.exec(`git branch -D ${backupRef}`);
+
+        // Clean the working tree before checkout to avoid "dirty tree" conflicts.
+        await runCommand('git reset --hard HEAD', { cwd: this.projectPath });
+        await runCommand('git clean -fd', { cwd: this.projectPath });
+
+        const checkoutResult = await runCommand(`git checkout ${target}`, {
+          cwd: this.projectPath,
+        });
+        if (checkoutResult.exitCode !== 0) {
+          return {
+            success: false,
+            strategy: 'branch',
+            message: `Rollback: checkout '${target}' failed: ${checkoutResult.stderr.trim()}`,
+            recoveryInstructions: `git checkout ${target} && git branch -D ${backupRef}`,
+          };
+        }
+
+        await runCommand(`git branch -D ${backupRef}`, { cwd: this.projectPath });
         return {
           success: true,
           strategy: 'branch',
           message: `Rolled back: checked out '${target}' and deleted '${backupRef}'.`,
         };
       } else {
-        this.exec(`git checkout ${backupRef}`);
+        // Tag strategy: hard-reset to the tagged commit (avoids detached HEAD).
+        const resetResult = await runCommand(`git reset --hard ${backupRef}`, {
+          cwd: this.projectPath,
+        });
+        if (resetResult.exitCode !== 0) {
+          return {
+            success: false,
+            strategy: 'tag',
+            message: `Rollback: reset to tag '${backupRef}' failed: ${resetResult.stderr.trim()}`,
+            recoveryInstructions: `git reset --hard ${backupRef}`,
+          };
+        }
         return {
           success: true,
           strategy: 'tag',
-          message: `Rolled back: restored project state from tag '${backupRef}'.`,
+          message: `Rolled back: reset to tag '${backupRef}'.`,
         };
       }
     } catch (err) {
       const recoveryInstructions =
         strategy === 'branch'
           ? `git checkout ${originalBranch ?? 'main'} && git branch -D ${backupRef}`
-          : `git checkout ${backupRef}`;
+          : `git reset --hard ${backupRef}`;
       return {
         success: false,
         strategy,
@@ -110,9 +149,5 @@ export class RollbackManager {
         recoveryInstructions,
       };
     }
-  }
-
-  private exec(cmd: string): void {
-    execSync(cmd, { cwd: this.projectPath, stdio: 'pipe' });
   }
 }

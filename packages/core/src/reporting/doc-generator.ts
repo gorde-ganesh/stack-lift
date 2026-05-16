@@ -490,7 +490,22 @@ export function generateExecutionJson(report: UpgradeReport, opts?: SerializeOpt
   const filesModified = files.filter((f) => f.applied.length > 0).length;
   const applied = files.reduce((n, f) => n + f.applied.length, 0);
 
+  const commands = report.commandExecutions
+    ? report.commandExecutions.map((e) => ({
+        cmd: e.cmd,
+        durationMs: e.durationMs,
+        exitCode: e.exitCode,
+        stderrSummary: e.stderrSummary ?? null,
+        stdoutSummary: e.stdoutSummary ?? null,
+        timedOut: e.timedOut,
+      }))
+    : null;
+
+  const commandsFailed = report.commandExecutions?.filter((e) => e.exitCode !== 0).length ?? 0;
+
   return stableStringify({
+    ...(commands !== null ? { commandExecutionStatus: report.commandExecutionStatus ?? null } : {}),
+    ...(commands !== null ? { commands } : {}),
     files,
     generatedAt: resolveTimestamp(report, opts),
     project: {
@@ -501,6 +516,8 @@ export function generateExecutionJson(report: UpgradeReport, opts?: SerializeOpt
     schemaVersion: SCHEMA_VERSION,
     summary: {
       applied,
+      ...(commands !== null ? { commandsFailed } : {}),
+      ...(commands !== null ? { commandsRun: commands.length } : {}),
       filesModified,
       filesScanned: files.length,
       totalSuggestions,

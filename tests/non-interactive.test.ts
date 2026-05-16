@@ -17,7 +17,7 @@ vi.mock('@inquirer/prompts', () => ({
 
 // Mock build validator so tests don't run real shell commands
 vi.mock('../src/engines/build-validator.js', () => ({
-  validateBuild: vi.fn().mockReturnValue([
+  validateBuild: vi.fn().mockResolvedValue([
     { step: 'install', status: 'skipped' },
     { step: 'build', status: 'skipped' },
   ]),

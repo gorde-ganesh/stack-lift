@@ -642,7 +642,7 @@ program
         if (options.validate) {
           const stack = result.report.stack;
           const valSpinner = ora('Running build validation…').start();
-          const buildResults = validateBuild({
+          const buildResults = await validateBuild({
             projectPath: resolved,
             packageManager: stack.packageManager,
             steps: ['install', 'build', 'test', 'lint'],
