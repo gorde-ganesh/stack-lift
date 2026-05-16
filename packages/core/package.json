@@ -1,0 +1,5 @@
+{
+  "name": "@stack-lift/core",
+  "private": true,
+  "type": "module"
+}
