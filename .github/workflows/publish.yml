@@ -18,7 +18,6 @@ permissions:
 jobs:
   publish:
     name: Bump, publish, release
-    needs: ci
     runs-on: ubuntu-latest
     environment: production
 
