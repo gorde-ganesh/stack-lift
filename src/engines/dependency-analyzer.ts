@@ -175,10 +175,10 @@ function auditCommand(packageManager: PackageManager): string {
   }
 }
 
-export async function runSecurityAudit(
+export function runSecurityAudit(
   projectPath: string,
   packageManager: PackageManager,
-): Promise<DependencyInfo[]> {
+): DependencyInfo[] {
   const cmd = auditCommand(packageManager);
   let raw: string;
   try {
