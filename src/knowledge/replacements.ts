@@ -33,6 +33,16 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
       },
     ],
     skipOption: 'Keep moment for now (address later)',
+    contextQuestions: [
+      {
+        id: 'moment-timezone',
+        question: 'Do you use timezone-aware date formatting (moment.tz(), utcOffset(), etc.)?',
+        choices: [
+          { label: 'Yes — timezone handling is needed', value: 'yes' },
+          { label: 'No — dates only, no timezone logic', value: 'no' },
+        ],
+      },
+    ],
   },
 
   protractor: {
@@ -128,6 +138,16 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
       },
     ],
     skipOption: 'Keep react-scripts temporarily',
+    contextQuestions: [
+      {
+        id: 'react-scripts-ssr',
+        question: 'Do you need server-side rendering (SSR) or API routes?',
+        choices: [
+          { label: 'Yes — need SSR or API routes', value: 'yes' },
+          { label: 'No — SPA only, client-side rendering', value: 'no' },
+        ],
+      },
+    ],
   },
 
   request: {
@@ -228,6 +248,16 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
       },
     ],
     skipOption: 'Keep Karma temporarily (tests still pass)',
+    contextQuestions: [
+      {
+        id: 'karma-angular',
+        question: 'Is this an Angular project?',
+        choices: [
+          { label: 'Yes — Angular project', value: 'yes' },
+          { label: 'No — non-Angular project', value: 'no' },
+        ],
+      },
+    ],
   },
 
   'jasmine-core': {

@@ -69,11 +69,19 @@ export interface PackageAlternative {
   notes?: string;
 }
 
+export interface ContextQuestion {
+  id: string;
+  question: string;
+  choices: Array<{ label: string; value: string }>;
+}
+
 export interface ReplacementEntry {
   deprecated: string;
   reason: string;
   alternatives: PackageAlternative[];
   skipOption: string;
+  /** Context questions asked before showing alternatives — answers reorder the list. */
+  contextQuestions?: ContextQuestion[];
 }
 
 export interface PackageReplacement {
@@ -93,12 +101,20 @@ export interface MigrationDecisions {
   autoApply: boolean;
 }
 
+export interface SessionFingerprint {
+  packageJsonHash: string;
+  lockfileHash?: string;
+  gitHead?: string;
+  frameworkVersion: string;
+}
+
 export interface SessionState {
   projectPath: string;
   createdAt: string;
   lastUpdatedAt: string;
   decisions: Partial<MigrationDecisions>;
   phase: 'discovery' | 'decisions' | 'planning' | 'done';
+  fingerprint?: SessionFingerprint;
 }
 
 export interface TsconfigInfo {
@@ -246,6 +262,8 @@ export interface UpgradeReport {
   refactorResults: RefactorResult[];
   manualActions: string[];
   buildStatus: 'success' | 'failed' | 'skipped';
+  /** Build validation results captured before the migration (baseline). */
+  baselineValidation?: BuildValidationResult[];
   buildValidation?: BuildValidationResult[];
   decisions?: Partial<MigrationDecisions>;
   generatedAt: string;

@@ -44,6 +44,22 @@ StackLift replaces the guesswork. It:
 8. **Validates** the result by running install → build → test → lint
 9. **Writes** versioned markdown, JSON, `findings.json`, and `plan.json` artifacts to an output directory
 
+### Feature status
+
+| Capability | Status |
+|---|---|
+| Interactive migration | Stable |
+| Dependency audit / peer conflicts | Stable |
+| Build validation | Stable |
+| Session resume | Stable |
+| Yarn / pnpm lockfile parsing | Stable |
+| AST refactors (TestBed.get, ReactDOM.render, HttpModule) | Stable |
+| Additional AST detectors (UNSAFE lifecycles, string refs) | Advisory only |
+| CI Node version check | Beta |
+| Security audit integration | Beta |
+| Monorepo support | Experimental |
+| Vue / Svelte / NestJS / Node.js support | Planned |
+
 ---
 
 ## Installation
@@ -444,7 +460,7 @@ StackLift knows alternatives for these deprecated or maintenance-mode packages a
 
 ### Monorepo detection
 
-Detected via: `workspaces` in `package.json`, `pnpm-workspace.yaml`, `lerna.json`, `nx.json`, `turbo.json`. Root-level shared dependencies are flagged separately from per-project dependencies.
+**Status: Experimental.** Detection is stable — StackLift identifies monorepos via `workspaces` in `package.json`, `pnpm-workspace.yaml`, `lerna.json`, `nx.json`, and `turbo.json`, and flags the fact in its output. Per-workspace upgrade plans, scoped execution, workspace-aware build validation, and dependency-graph analysis are not yet implemented. For monorepos, run `stack-lift migrate` on each workspace package directory individually.
 
 ### Planned
 

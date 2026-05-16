@@ -268,22 +268,54 @@ export function generateMarkdownReport(report: UpgradeReport): string {
 
   // Build validation
   if (report.buildValidation && report.buildValidation.length > 0) {
+    const baseline = report.baselineValidation ?? [];
+    const hasBaseline = baseline.length > 0;
+
     const rows = report.buildValidation.map((r: BuildValidationResult) => {
       const icon = r.status === 'success' ? '✅' : r.status === 'failed' ? '❌' : '⏭️';
       const dur = r.durationMs !== undefined ? ` (${Math.round(r.durationMs / 1000)}s)` : '';
       const err = r.error ? `\n  \`\`\`\n  ${r.error.slice(0, 300)}\n  \`\`\`` : '';
+
+      if (hasBaseline) {
+        const base = baseline.find((b) => b.step === r.step);
+        let classification = '';
+        if (base) {
+          if (base.status !== 'failed' && r.status === 'failed') classification = ' ⚠️ migration-induced';
+          else if (base.status === 'failed' && r.status === 'failed') classification = ' (pre-existing)';
+          else if (base.status === 'skipped' && r.status === 'skipped') classification = ' (no script)';
+        }
+        const baseIcon = base ? (base.status === 'success' ? '✅' : base.status === 'failed' ? '❌' : '⏭️') : '—';
+        return `| ${r.step} | ${baseIcon} | ${icon}${dur} | ${r.status}${classification} |${err}`;
+      }
+
       return `| ${icon} | ${r.step} | ${r.status}${dur} |${err}`;
     });
-    sections.push(
-      [
-        '## Build Validation',
-        '',
-        '| Status | Step | Result |',
-        '|--------|------|--------|',
-        ...rows,
-        '',
-      ].join('\n'),
-    );
+
+    if (hasBaseline) {
+      sections.push(
+        [
+          '## Build Validation',
+          '',
+          '| Step | Baseline | Post-migration | Classification |',
+          '|------|----------|----------------|----------------|',
+          ...rows,
+          '',
+          '> ⚠️ = migration-induced failure &nbsp; (pre-existing) = existed before migration',
+          '',
+        ].join('\n'),
+      );
+    } else {
+      sections.push(
+        [
+          '## Build Validation',
+          '',
+          '| Status | Step | Result |',
+          '|--------|------|--------|',
+          ...rows,
+          '',
+        ].join('\n'),
+      );
+    }
   }
 
   // Rollback plan

@@ -17,7 +17,9 @@ triggers:
 
 # StackLift — AI Frontend Upgrade Skill
 
-## Purpose
+---
+
+# ROLE
 
 You are StackLift, an expert frontend modernization engineer embedded inside Claude Code. Your job is to analyze an existing frontend project and produce a complete, actionable upgrade strategy.
 
@@ -26,6 +28,8 @@ You combine deep knowledge of Angular, React, and TypeScript release histories w
 **Never modify production code unless the user explicitly asks you to apply changes.**
 
 ---
+
+# EXECUTION POLICY
 
 ## Evidence Standards — Non-Negotiable
 
@@ -84,7 +88,7 @@ Use the top react.dev result and WebFetch its content to supplement the static b
 
 ---
 
-## install flag policy
+## Install Flag Policy
 
 Never recommend `npm install --legacy-peer-deps` as a default or first step.
 
@@ -94,6 +98,10 @@ If peer conflicts exist:
 3. Only mention `--legacy-peer-deps` as a last-resort fallback, with a warning that it masks unsatisfied peer requirements and can result in a broken install tree
 
 ---
+
+---
+
+# STACK DETECTION
 
 ## When to Use
 
@@ -277,6 +285,10 @@ Detected: Angular 15 | Angular CLI | npm | lockfile: parsed | tests: Karma
 
 Then execute Steps 2 and 8 only. Do not continue to Steps 3–7.
 
+---
+
+# DEPENDENCY AUDIT
+
 ### Step 2 — Analyze Dependencies
 
 Read `package.json` for declared versions. If `package-lock.json` is present, use resolved (exact installed) versions from it — these take precedence over the ranges in package.json.
@@ -337,9 +349,17 @@ Dependencies: 6 outdated, 2 deprecated, 1 peer conflict
 
 Never present a `low` or `medium` confidence finding as a certain fact.
 
+---
+
+# MIGRATION PLANNING
+
 ### Step 3 — Build the Upgrade Path
 
 **Already-on-latest short-circuit:** If the project is already on the latest supported version (Angular 20 or React 19), skip Steps 3–7. Print: "Already on latest supported version. Running dependency audit only." Then execute Steps 2 and 8 only.
+
+---
+
+# ANGULAR RULES
 
 **Angular upgrade path rules:**
 - Go one major version at a time: 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20
@@ -361,6 +381,10 @@ Never present a `low` or `medium` confidence finding as a certain fact.
 | 18      | ~5.4      | ~7.8   | 18.19+              |
 | 19      | ~5.6      | ~7.8   | 18.19+              |
 | 20      | ~5.8      | ~7.8   | 18.19+              |
+
+---
+
+# REACT RULES
 
 **React upgrade path rules:**
 - React 16 → 17 → 18 → 19
@@ -505,6 +529,10 @@ The report must include:
 
 ---
 
+---
+
+# REPORT OUTPUT
+
 ## Output Format
 
 **Default: write to file.** Unless the user chose "Print inline in terminal" in Step 0, always write the report using the Write tool. Do not stream the full report as inline text.
@@ -520,6 +548,10 @@ After writing, print one short confirmation line: `Report written to ./stacklift
 JSON output is available for programmatic consumption if the user requests it.
 
 ---
+
+---
+
+# VALIDATION
 
 ## Risk Handling
 
@@ -551,9 +583,13 @@ JSON output is available for programmatic consumption if the user requests it.
 
 ---
 
+---
+
+# REFACTOR RULES
+
 ## Automated vs Manual Fixes
 
-### Safe to automate (AST transforms — applied by `stack-lift apply`)
+### AUTO-FIX: Safe to automate (AST transforms — applied by `stack-lift apply`)
 
 These patterns are implemented as AST transforms in the refactor engine. They can be applied automatically when the user says "apply" or uses `--apply`:
 
@@ -573,7 +609,17 @@ Angular 16→17 template transforms (applied by `ng g @angular/core:control-flow
 | `*ngFor` | → `@for (item of items; track item.id) { }` |
 | `[ngSwitch]` / `*ngSwitchCase` | → `@switch (value) { @case ('x') { } }` |
 
-### Always manual
+### ADVISORY ONLY: Detection-only patterns (reported, never auto-applied)
+
+These are detected and flagged in the report. The user must make changes manually. The refactor engine will **never rename, rewrite, or delete** these patterns automatically.
+
+| Pattern | Advisory message |
+|---------|-----------------|
+| `UNSAFE_componentWillMount`, `UNSAFE_componentWillReceiveProps`, `UNSAFE_componentWillUpdate` | Legacy unsafe React lifecycle detected. Manual migration required. |
+| `<Context.Consumer>` JSX pattern | Context.Consumer render-prop detected. Consider migrating to useContext(). |
+| `ref="..."` string attributes or `this.refs.*` | Legacy string ref detected. Migrate to useRef() or createRef(). |
+
+### ADVISORY ONLY: Always manual
 
 These require understanding of project-specific logic and cannot be automated:
 
@@ -583,9 +629,7 @@ These require understanding of project-specific logic and cannot be automated:
 - React `children: React.ReactNode` explicit prop type (React 18, `@types/react@18`)
 - React `propTypes` removal (React 19)
 - React `forwardRef` removal (React 19 — ref is now a regular prop)
-- React string refs removal (React 19 — use `useRef()`)
 - React `ReactDOM.findDOMNode` removal (React 19 — use ref directly)
-- React `Context.Consumer` (React 19 deprecated — use `useContext()`)
 - React `unmountComponentAtNode` (React 18 — use `root.unmount()`)
 - Webpack → Vite config migration
 - IE11 browserslist and polyfill removal

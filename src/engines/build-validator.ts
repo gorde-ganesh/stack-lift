@@ -3,11 +3,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { BuildValidationResult, PackageManager } from '../types/index.js';
 
-const PM_CMDS: Record<PackageManager, { install: string; build: string; test: string; lint: string }> = {
-  npm:  { install: 'npm install',      build: 'npm run build',  test: 'npm test',       lint: 'npm run lint' },
-  yarn: { install: 'yarn install',     build: 'yarn build',     test: 'yarn test',      lint: 'yarn lint' },
-  pnpm: { install: 'pnpm install',     build: 'pnpm build',     test: 'pnpm test',      lint: 'pnpm lint' },
-  bun:  { install: 'bun install',      build: 'bun run build',  test: 'bun test',       lint: 'bun run lint' },
+const PM_CMDS: Record<PackageManager, { install: string; installImmutable: string; build: string; test: string; lint: string }> = {
+  npm:  { install: 'npm install',      installImmutable: 'npm ci',                          build: 'npm run build',  test: 'npm test',       lint: 'npm run lint' },
+  yarn: { install: 'yarn install',     installImmutable: 'yarn install --immutable',         build: 'yarn build',     test: 'yarn test',      lint: 'yarn lint' },
+  pnpm: { install: 'pnpm install',     installImmutable: 'pnpm install --frozen-lockfile',   build: 'pnpm build',     test: 'pnpm test',      lint: 'pnpm lint' },
+  bun:  { install: 'bun install',      installImmutable: 'bun install',                      build: 'bun run build',  test: 'bun test',       lint: 'bun run lint' },
 };
 
 function hasScript(projectPath: string, name: string): boolean {
@@ -49,6 +49,8 @@ function runStep(
 export interface ValidateOptions {
   projectPath: string;
   packageManager: PackageManager;
+  /** Whether a lockfile was present and parsed. When true, install uses a lock-safe command. */
+  lockfileParsed?: boolean;
   /** Which steps to run. Defaults to all available. */
   steps?: Array<BuildValidationResult['step']>;
 }
@@ -56,9 +58,11 @@ export interface ValidateOptions {
 /**
  * Run build validation steps after a migration.
  * Each step is only run if the corresponding script exists in package.json (except install).
+ * When lockfileParsed is true the install step uses npm ci / --frozen-lockfile / --immutable
+ * to avoid mutating the dependency graph during validation.
  */
 export function validateBuild(options: ValidateOptions): BuildValidationResult[] {
-  const { projectPath, packageManager, steps = ['install', 'build', 'test', 'lint'] } = options;
+  const { projectPath, packageManager, lockfileParsed = false, steps = ['install', 'build', 'test', 'lint'] } = options;
   const cmds = PM_CMDS[packageManager];
   const results: BuildValidationResult[] = [];
 
@@ -70,7 +74,8 @@ export function validateBuild(options: ValidateOptions): BuildValidationResult[]
         continue;
       }
     }
-    results.push(runStep(step, cmds[step], projectPath));
+    const cmd = step === 'install' && lockfileParsed ? cmds.installImmutable : cmds[step];
+    results.push(runStep(step, cmd, projectPath));
   }
 
   return results;

@@ -266,6 +266,7 @@ program
   .command('analyze <path>')
   .description('Alias for audit — analyze a project and show what needs upgrading')
   .action(async (projectPath: string) => {
+    console.warn(chalk.yellow('  ⚠  stack-lift analyze is deprecated. Use stack-lift audit instead.'));
     const spinner = ora('Analyzing project…').start();
     try {
       const stack = detectStack(path.resolve(projectPath));
@@ -315,6 +316,7 @@ program
 program
   .command('upgrade <path>')
   .description('Generate a full upgrade plan with breaking changes and code suggestions')
+  // deprecated warning added to action handler below
   .option('-t, --to <version>', 'Target major version (e.g. 18 for Angular 18)')
   .option(
     '-o, --output <formats>',
@@ -329,6 +331,7 @@ program
       projectPath: string,
       options: { to?: string; output: string; outDir: string; apply: boolean; dryRun: boolean },
     ) => {
+      console.warn(chalk.yellow('  ⚠  stack-lift upgrade is deprecated. Use stack-lift migrate instead.'));
       const spinner = ora('Running upgrade analysis…').start();
       try {
         const resolved = path.resolve(projectPath);

@@ -9,7 +9,7 @@ import { planUpgrade } from './upgrade-planner.js';
 import { analyzeBreakingChanges } from './breaking-change-analyzer.js';
 import { applyRefactors } from './refactor-engine.js';
 import { writeArtifacts, writeMachineArtifacts } from './artifact-writer.js';
-import { readSession, updateSession, clearSession } from './session.js';
+import { readSession, updateSession, clearSession, computeFingerprint, isFingerprintStale } from './session.js';
 import { getReplacementEntry } from '../knowledge/replacements.js';
 import { ANGULAR_SUPPORTED_VERSIONS, getAngularLatestVersion } from '../knowledge/angular.js';
 import { REACT_SUPPORTED_VERSIONS, getReactLatestVersion } from '../knowledge/react.js';
@@ -183,8 +183,51 @@ async function askPackageReplacements(
       continue;
     }
 
+    // Ask context questions (if any) and reorder alternatives accordingly
+    let orderedAlternatives = [...entry.alternatives];
+    if (entry.contextQuestions && entry.contextQuestions.length > 0) {
+      for (const q of entry.contextQuestions) {
+        const answer = await select<string>({
+          message: q.question,
+          choices: q.choices.map(c => ({ name: c.label, value: c.value })),
+        });
+
+        // Apply reorder rules per package
+        if (pkg === 'moment' && q.id === 'moment-timezone') {
+          if (answer === 'yes') {
+            // Promote luxon first
+            orderedAlternatives = [
+              ...orderedAlternatives.filter(a => a.name === 'luxon'),
+              ...orderedAlternatives.filter(a => a.name !== 'luxon'),
+            ];
+          } else {
+            // Promote dayjs first (already default, no change needed)
+          }
+        } else if (pkg === 'karma' && q.id === 'karma-angular') {
+          if (answer === 'yes') {
+            // Promote @web/test-runner first (already default)
+          } else {
+            // Promote jest first for non-Angular
+            orderedAlternatives = [
+              ...orderedAlternatives.filter(a => a.name === 'jest'),
+              ...orderedAlternatives.filter(a => a.name !== 'jest'),
+            ];
+          }
+        } else if (pkg === 'react-scripts' && q.id === 'react-scripts-ssr') {
+          if (answer === 'yes') {
+            // Promote next.js first
+            orderedAlternatives = [
+              ...orderedAlternatives.filter(a => a.name === 'next.js'),
+              ...orderedAlternatives.filter(a => a.name !== 'next.js'),
+            ];
+          }
+          // else vite stays first (already default)
+        }
+      }
+    }
+
     const choices = [
-      ...entry.alternatives.map(alt => ({
+      ...orderedAlternatives.map(alt => ({
         name: [
           chalk.bold(alt.name),
           chalk.dim(`—`),
@@ -377,11 +420,31 @@ export async function runInteractive(
   if (!ni) {
     const existing = readSession(resolved);
     if (existing && existing.phase !== 'done') {
-      const resume = await confirm({
-        message: `Resume previous session from ${chalk.cyan(existing.lastUpdatedAt)}?`,
-        default: true,
-      });
-      if (!resume) clearSession(resolved);
+      let stale = false;
+      if (existing.fingerprint) {
+        try {
+          const current = computeFingerprint(resolved, existing.fingerprint.frameworkVersion);
+          stale = isFingerprintStale(existing.fingerprint, current);
+        } catch {
+          // fingerprint check failed — treat as not stale, resume is safe to offer
+        }
+      }
+      if (stale) {
+        console.log('');
+        console.log(chalk.yellow('  ⚠ Project changed since session creation.'));
+        console.log(chalk.dim('  Resuming may produce invalid analysis (package.json, lockfile, or git HEAD changed).'));
+        const resume = await confirm({
+          message: 'Resume anyway?',
+          default: false,
+        });
+        if (!resume) clearSession(resolved);
+      } else {
+        const resume = await confirm({
+          message: `Resume previous session from ${chalk.cyan(existing.lastUpdatedAt)}?`,
+          default: true,
+        });
+        if (!resume) clearSession(resolved);
+      }
     }
   }
 
@@ -397,6 +460,12 @@ export async function runInteractive(
   }
 
   printDiscovery(stack);
+
+  // Store fingerprint so future resumes can detect project changes
+  try {
+    const fp = computeFingerprint(resolved, `${stack.framework} ${stack.frameworkVersion}`);
+    updateSession(resolved, { fingerprint: fp });
+  } catch { /* non-fatal — fingerprint is best-effort */ }
 
   if (!ni) {
     const shouldContinue = await confirm({ message: 'Continue with this project?', default: true });
@@ -527,6 +596,29 @@ export async function runInteractive(
     }
   }
 
+  // ── Baseline validation (before any migration changes) ────────────────────
+  let baselineValidation: import('../types/index.js').BuildValidationResult[] | undefined;
+  const runValidation = interactiveOpts.validate ?? niOpts.validate ?? false;
+  if (runValidation) {
+    const baseSpinner = ora('Running baseline build validation (before migration)…').start();
+    try {
+      baselineValidation = validateBuild({
+        projectPath: resolved,
+        packageManager: stack.packageManager,
+        ...(stack.lockfileParsed !== undefined ? { lockfileParsed: stack.lockfileParsed } : {}),
+        steps: ['install', 'build', 'test', 'lint'],
+      });
+      const baseFailed = baselineValidation.filter(r => r.status === 'failed');
+      if (baseFailed.length > 0) {
+        baseSpinner.warn(`Baseline: ${baseFailed.length} pre-existing failure(s) — will be noted in report`);
+      } else {
+        baseSpinner.succeed('Baseline build validation passed');
+      }
+    } catch (err) {
+      baseSpinner.fail(`Baseline validation error: ${String(err)}`);
+    }
+  }
+
   // ── Backup ─────────────────────────────────────────────────────────────────
   if (backupStrategy !== 'none') {
     if (!ni && isGitDirty(resolved)) {
@@ -589,18 +681,19 @@ export async function runInteractive(
     refactorResults,
     manualActions,
     buildStatus: 'skipped',
+    ...(baselineValidation ? { baselineValidation } : {}),
     decisions,
     generatedAt: new Date().toISOString(),
   };
 
-  // ── Build validation ───────────────────────────────────────────────────────
-  const runValidation = interactiveOpts.validate ?? niOpts.validate ?? false;
+  // ── Build validation (post-migration) ─────────────────────────────────────
   if (runValidation) {
-    const valSpinner = ora('Running build validation…').start();
+    const valSpinner = ora('Running post-migration build validation…').start();
     try {
       report.buildValidation = validateBuild({
         projectPath: resolved,
         packageManager: stack.packageManager,
+        ...(stack.lockfileParsed !== undefined ? { lockfileParsed: stack.lockfileParsed } : {}),
         steps: ['install', 'build', 'test', 'lint'],
       });
       const failed = report.buildValidation.filter(r => r.status === 'failed');
