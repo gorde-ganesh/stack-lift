@@ -48,6 +48,8 @@ export type {
   ExecuteCommandsOptions,
   ExecuteCommandsResult,
 } from './execution/command-runner.js';
+export { RollbackManager } from './execution/rollback-manager.js';
+export type { RollbackResult, RollbackStrategy } from './execution/rollback-manager.js';
 
 // Validation
 export { validateBuild } from './validation/build-validator.js';

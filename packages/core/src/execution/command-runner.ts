@@ -61,7 +61,13 @@ export function runCommand(cmd: string, options: CommandOptions): Promise<Comman
   if (dryRun) {
     const msg = `[dry-run] ${cmd}`;
     onStdout?.(msg + '\n');
-    return Promise.resolve({ exitCode: 0, stdout: msg, stderr: '', durationMs: 0, timedOut: false });
+    return Promise.resolve({
+      exitCode: 0,
+      stdout: msg,
+      stderr: '',
+      durationMs: 0,
+      timedOut: false,
+    });
   }
 
   return new Promise((resolve) => {
@@ -143,8 +149,13 @@ export async function restoreGitBackup(projectPath: string, ref: BackupRef): Pro
 export async function executeCommands(
   options: ExecuteCommandsOptions,
 ): Promise<ExecuteCommandsResult> {
-  const { projectPath, commands, dryRun = false, timeoutMs = DEFAULT_TIMEOUT_MS, onOutput } =
-    options;
+  const {
+    projectPath,
+    commands,
+    dryRun = false,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    onOutput,
+  } = options;
 
   const executions: CommandExecution[] = [];
 
@@ -180,5 +191,5 @@ export async function executeCommands(
     }
   }
 
-  return { executions, status: 'success', backupRef };
+  return { executions, status: 'success', ...(backupRef !== undefined ? { backupRef } : {}) };
 }

@@ -56,6 +56,9 @@ export type MigrationObjective =
   | 'performance'
   | 'full-migration';
 
+/** Controls how much autonomy stack-lift has during migration. */
+export type ExecutionMode = 'safe' | 'guided' | 'autonomous';
+
 export type BackupStrategy = 'branch' | 'tag' | 'none';
 
 export type ArtifactFormat = 'markdown' | 'json';

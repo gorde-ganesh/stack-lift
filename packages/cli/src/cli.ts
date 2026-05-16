@@ -22,6 +22,7 @@ import type {
   RiskLevel,
   ArtifactFormat,
   MigrationObjective,
+  ExecutionMode,
 } from '@stack-lift/shared';
 
 const require = createRequire(import.meta.url);
@@ -550,6 +551,11 @@ program
   .option('--json', 'Include JSON in output artifacts', false)
   .option('--markdown', 'Include Markdown in output artifacts (default: on)', false)
   .option('--out-dir <dir>', 'Output directory for artifacts', './stacklift-output')
+  .option(
+    '--mode <mode>',
+    'Execution mode: safe (analysis-only), guided (interactive, default), autonomous (auto-apply + rollback)',
+    'guided',
+  )
   .action(
     async (
       projectPath: string,
@@ -564,27 +570,38 @@ program
         json: boolean;
         markdown: boolean;
         outDir: string;
+        mode: string;
       },
     ) => {
+      const validModes: ExecutionMode[] = ['safe', 'guided', 'autonomous'];
+      const executionMode = validModes.includes(options.mode as ExecutionMode)
+        ? (options.mode as ExecutionMode)
+        : 'guided';
+
+      // safe mode implies dry-run; autonomous implies non-interactive + apply + validate
+      const isSafe = executionMode === 'safe';
+      const isAutonomous = executionMode === 'autonomous';
+
       try {
         const formats: ArtifactFormat[] = [];
         if (options.markdown || (!options.json && !options.markdown)) formats.push('markdown');
         if (options.json) formats.push('json');
 
         await runInteractive(projectPath, {
-          nonInteractive: options.nonInteractive || options.yes,
-          apply: options.apply,
-          validate: options.validate,
+          nonInteractive: options.nonInteractive || options.yes || isAutonomous,
+          apply: options.apply || isAutonomous,
+          validate: options.validate || isAutonomous,
+          executionMode,
           options: {
             ...(options.target !== undefined ? { target: options.target } : {}),
             ...(options.objective !== undefined
               ? { objective: options.objective as MigrationObjective }
               : {}),
-            yes: options.yes,
-            dryRun: options.dryRun,
+            yes: options.yes || isAutonomous,
+            dryRun: options.dryRun || isSafe,
             outputFormats: formats,
             outputDir: options.outDir,
-            validate: options.validate,
+            validate: options.validate || isAutonomous,
           },
         });
       } catch (err) {

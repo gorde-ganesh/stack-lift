@@ -20,6 +20,7 @@ import { getReplacementEntry } from '../knowledge/replacements.js';
 import { ANGULAR_SUPPORTED_VERSIONS, getAngularLatestVersion } from '../knowledge/angular.js';
 import { REACT_SUPPORTED_VERSIONS, getReactLatestVersion } from '../knowledge/react.js';
 import { validateBuild } from './build-validator.js';
+import { RollbackManager } from './rollback-manager.js';
 import type {
   StackInfo,
   MigrationObjective,
@@ -29,6 +30,8 @@ import type {
   PackageReplacement,
   UpgradeReport,
   NonInteractiveOptions,
+  BuildValidationResult,
+  ExecutionMode,
 } from '../types/index.js';
 import { execSync } from 'node:child_process';
 
@@ -372,18 +375,28 @@ function isGitDirty(projectPath: string): boolean {
 
 // ── Git backup ────────────────────────────────────────────────────────────────
 
-function applyBackup(projectPath: string, strategy: BackupStrategy): void {
+function createBackupManager(projectPath: string, strategy: BackupStrategy): RollbackManager {
+  const manager = new RollbackManager(projectPath);
   try {
     if (strategy === 'branch') {
+      const originalBranch = execSync('git rev-parse --abbrev-ref HEAD', {
+        cwd: projectPath,
+        stdio: 'pipe',
+      })
+        .toString()
+        .trim();
       execSync('git checkout -b upgrade/stack-lift', { cwd: projectPath, stdio: 'pipe' });
+      manager.setBackup('upgrade/stack-lift', 'branch', originalBranch);
       console.log(chalk.green('  ✔ Created branch: upgrade/stack-lift'));
     } else if (strategy === 'tag') {
       execSync('git tag pre-upgrade-backup', { cwd: projectPath, stdio: 'pipe' });
+      manager.setBackup('pre-upgrade-backup', 'tag');
       console.log(chalk.green('  ✔ Created tag: pre-upgrade-backup'));
     }
   } catch (err) {
     console.log(chalk.yellow(`  ⚠ Could not create backup (${String(err)}). Continuing.`));
   }
+  return manager;
 }
 
 // ── Checklist printer ─────────────────────────────────────────────────────────
@@ -488,6 +501,13 @@ export interface InteractiveOptions {
   apply?: boolean;
   /** When true, run build validation after planning. */
   validate?: boolean;
+  /**
+   * Controls migration autonomy level:
+   * - safe: analysis-only, no writes, no git changes (dry-run)
+   * - guided: interactive with user confirmation at each step (default)
+   * - autonomous: non-interactive, applies fixes, validates, auto-rollbacks on failure
+   */
+  executionMode?: ExecutionMode;
 }
 
 export async function runInteractive(
@@ -495,14 +515,24 @@ export async function runInteractive(
   interactiveOpts: InteractiveOptions = {},
 ): Promise<InteractiveRunResult> {
   const resolved = path.resolve(projectPath);
-  const ni = interactiveOpts.nonInteractive ?? false;
+  const rawNi = interactiveOpts.nonInteractive ?? false;
   const niOpts = interactiveOpts.options ?? {};
+  const mode = interactiveOpts.executionMode ?? 'guided';
+  const isSafe = mode === 'safe';
+  const isAutonomous = mode === 'autonomous';
+  const ni = rawNi || isAutonomous;
+  const isDryRun = isSafe || (niOpts.dryRun ?? false);
   const autoYes = ni || (niOpts.yes ?? false);
+  const applyFixes = interactiveOpts.apply || isAutonomous;
+  const effectiveValidate = (interactiveOpts.validate ?? niOpts.validate ?? false) || isAutonomous;
 
   console.log('');
   console.log(chalk.bold.blue('  ╔══════════════════════════════════════════╗'));
   console.log(chalk.bold.blue('  ║        stack-lift interactive migrate      ║'));
-  if (ni) console.log(chalk.bold.blue('  ║              [non-interactive mode]       ║'));
+  if (isSafe) console.log(chalk.bold.yellow('  ║            [safe / analysis-only mode]    ║'));
+  else if (isAutonomous)
+    console.log(chalk.bold.yellow('  ║              [autonomous mode]            ║'));
+  else if (ni) console.log(chalk.bold.blue('  ║              [non-interactive mode]       ║'));
   console.log(chalk.bold.blue('  ╚══════════════════════════════════════════╝'));
 
   // ── Check for existing session ─────────────────────────────────────────────
@@ -709,9 +739,8 @@ export async function runInteractive(
   }
 
   // ── Baseline validation (before any migration changes) ────────────────────
-  let baselineValidation: import('../types/index.js').BuildValidationResult[] | undefined;
-  const runValidation = interactiveOpts.validate ?? niOpts.validate ?? false;
-  if (runValidation) {
+  let baselineValidation: BuildValidationResult[] | undefined;
+  if (effectiveValidate && !isDryRun) {
     const baseSpinner = ora('Running baseline build validation (before migration)…').start();
     try {
       baselineValidation = validateBuild({
@@ -734,7 +763,8 @@ export async function runInteractive(
   }
 
   // ── Backup ─────────────────────────────────────────────────────────────────
-  if (backupStrategy !== 'none') {
+  let rollbackManager: RollbackManager | null = null;
+  if (backupStrategy !== 'none' && !isDryRun) {
     if (!ni && isGitDirty(resolved)) {
       console.log('');
       console.log(chalk.yellow('  ⚠ Working tree has uncommitted changes.'));
@@ -753,125 +783,148 @@ export async function runInteractive(
         process.exit(0);
       }
     }
-    applyBackup(resolved, backupStrategy);
+    rollbackManager = createBackupManager(resolved, backupStrategy);
   }
 
-  // ── Planning + analysis ────────────────────────────────────────────────────
-  // Initial plan without size hint — re-plan after scanning to calibrate effort
-  const planSpinner = ora('Building upgrade plan…').start();
-  const initialPlan = planUpgrade(stack, targetVersion);
-  planSpinner.succeed(
-    `Plan: ${initialPlan.steps.length} hop(s) — scanning source for size calibration…`,
-  );
-
-  const codeSpinner = ora('Scanning source files for breaking-change patterns…').start();
-  const codeSuggestions = analyzeBreakingChanges(resolved, initialPlan);
-  codeSpinner.succeed(`Found ${codeSuggestions.length} code location(s) to review`);
-
-  const affectedFiles = new Set(codeSuggestions.map((s) => s.file)).size;
-  const plan = planUpgrade(stack, targetVersion, {
-    affectedFiles,
-    totalOccurrences: codeSuggestions.length,
-  });
-
-  const planSpinner2 = ora(
-    `Effort calibrated: ${plan.estimatedEffort} (${affectedFiles} file(s), ${codeSuggestions.length} location(s))`,
-  ).start();
-  planSpinner2.succeed(
-    `Plan ready: ${plan.steps.length} step(s), ${plan.riskLevel} risk, effort ${plan.estimatedEffort}`,
-  );
-
-  const byFile = new Map<string, typeof codeSuggestions>();
-  for (const s of codeSuggestions) {
-    const list = byFile.get(s.file) ?? [];
-    list.push(s);
-    byFile.set(s.file, list);
-  }
-  let refactorResults = Array.from(byFile.entries()).map(([file, suggestions]) => ({
-    file,
-    suggestions,
-  }));
-
-  // Apply automated fixes if requested
-  if (interactiveOpts.apply) {
-    const applied = applyRefactors(codeSuggestions);
-    if (applied.length > 0) {
-      refactorResults = applied;
-      console.log(chalk.green(`  ✔ Applied automated fixes to ${applied.length} file(s)`));
-    }
-  }
-
-  const manualActions = [...new Set(plan.steps.flatMap((s) => s.manualActions))];
-
-  const report: UpgradeReport = {
-    stack,
-    plan,
-    outdatedDependencies: outdated,
-    peerConflicts,
-    refactorResults,
-    manualActions,
-    buildStatus: 'skipped',
-    ...(baselineValidation ? { baselineValidation } : {}),
-    decisions,
-    generatedAt: new Date().toISOString(),
-  };
-
-  // ── Build validation (post-migration) ─────────────────────────────────────
-  if (runValidation) {
-    const valSpinner = ora('Running post-migration build validation…').start();
-    try {
-      report.buildValidation = validateBuild({
-        projectPath: resolved,
-        packageManager: stack.packageManager,
-        ...(stack.lockfileParsed !== undefined ? { lockfileParsed: stack.lockfileParsed } : {}),
-        steps: ['install', 'build', 'test', 'lint'],
-      });
-      const failed = report.buildValidation.filter((r) => r.status === 'failed');
-      if (failed.length > 0) {
-        valSpinner.warn(`Build validation: ${failed.length} step(s) failed`);
-        report.buildStatus = 'failed';
-      } else {
-        valSpinner.succeed('Build validation passed');
-        report.buildStatus = 'success';
-      }
-    } catch (err) {
-      valSpinner.fail(`Build validation error: ${String(err)}`);
-    }
-  }
-
-  // ── Write artifacts ────────────────────────────────────────────────────────
-  const writeSpinner = ora(`Writing artifacts to ${outputDir}…`).start();
-  const resolvedOutputDir = path.resolve(resolved, outputDir);
-  let artifacts: Array<{ format: string; filePath: string }> = [];
+  // ── Planning + analysis (wrapped for auto-rollback on failure) ───────────────
   try {
-    const reportArtifacts = writeArtifacts(report, resolvedOutputDir, outputFormats);
-    const machineArtifacts = writeMachineArtifacts(report, resolvedOutputDir);
-    artifacts = [...reportArtifacts, ...machineArtifacts];
-    writeSpinner.succeed(`Wrote ${artifacts.length} artifact(s)`);
-  } catch (err) {
-    writeSpinner.fail(`Could not write artifacts: ${String(err)}`);
-  }
+    // Initial plan without size hint — re-plan after scanning to calibrate effort
+    const planSpinner = ora('Building upgrade plan…').start();
+    const initialPlan = planUpgrade(stack, targetVersion);
+    planSpinner.succeed(
+      `Plan: ${initialPlan.steps.length} hop(s) — scanning source for size calibration…`,
+    );
 
-  // ── Auto-fix notice ────────────────────────────────────────────────────────
-  if (!interactiveOpts.apply) {
-    const autoFixable = codeSuggestions.filter((s) => s.change.automated);
-    if (autoFixable.length > 0) {
-      console.log('');
-      console.log(
-        chalk.bold(`  ${chalk.green(String(autoFixable.length))} location(s) can be auto-fixed.`),
-      );
-      console.log(
-        chalk.dim(`  Re-run with ${chalk.white('stack-lift apply <path>')} to apply them.`),
-      );
+    const codeSpinner = ora('Scanning source files for breaking-change patterns…').start();
+    const codeSuggestions = analyzeBreakingChanges(resolved, initialPlan);
+    codeSpinner.succeed(`Found ${codeSuggestions.length} code location(s) to review`);
+
+    const affectedFiles = new Set(codeSuggestions.map((s) => s.file)).size;
+    const plan = planUpgrade(stack, targetVersion, {
+      affectedFiles,
+      totalOccurrences: codeSuggestions.length,
+    });
+
+    const planSpinner2 = ora(
+      `Effort calibrated: ${plan.estimatedEffort} (${affectedFiles} file(s), ${codeSuggestions.length} location(s))`,
+    ).start();
+    planSpinner2.succeed(
+      `Plan ready: ${plan.steps.length} step(s), ${plan.riskLevel} risk, effort ${plan.estimatedEffort}`,
+    );
+
+    const byFile = new Map<string, typeof codeSuggestions>();
+    for (const s of codeSuggestions) {
+      const list = byFile.get(s.file) ?? [];
+      list.push(s);
+      byFile.set(s.file, list);
     }
+    let refactorResults = Array.from(byFile.entries()).map(([file, suggestions]) => ({
+      file,
+      suggestions,
+    }));
+
+    // Apply automated fixes if requested
+    if (applyFixes && !isDryRun) {
+      const applied = applyRefactors(codeSuggestions);
+      if (applied.length > 0) {
+        refactorResults = applied;
+        console.log(chalk.green(`  ✔ Applied automated fixes to ${applied.length} file(s)`));
+      }
+    }
+
+    const manualActions = [...new Set(plan.steps.flatMap((s) => s.manualActions))];
+
+    const report: UpgradeReport = {
+      stack,
+      plan,
+      outdatedDependencies: outdated,
+      peerConflicts,
+      refactorResults,
+      manualActions,
+      buildStatus: 'skipped',
+      ...(baselineValidation ? { baselineValidation } : {}),
+      decisions,
+      generatedAt: new Date().toISOString(),
+    };
+
+    // ── Build validation (post-migration) ─────────────────────────────────────
+    if (effectiveValidate && !isDryRun) {
+      const valSpinner = ora('Running post-migration build validation…').start();
+      try {
+        report.buildValidation = validateBuild({
+          projectPath: resolved,
+          packageManager: stack.packageManager,
+          ...(stack.lockfileParsed !== undefined ? { lockfileParsed: stack.lockfileParsed } : {}),
+          steps: ['install', 'build', 'test', 'lint'],
+        });
+        const failed = report.buildValidation.filter((r) => r.status === 'failed');
+        if (failed.length > 0) {
+          valSpinner.warn(`Build validation: ${failed.length} step(s) failed`);
+          report.buildStatus = 'failed';
+        } else {
+          valSpinner.succeed('Build validation passed');
+          report.buildStatus = 'success';
+        }
+      } catch (err) {
+        valSpinner.fail(`Build validation error: ${String(err)}`);
+      }
+    }
+
+    // ── Write artifacts ────────────────────────────────────────────────────────
+    const resolvedOutputDir = path.resolve(resolved, outputDir);
+    let artifacts: Array<{ format: string; filePath: string }> = [];
+    if (!isDryRun) {
+      const writeSpinner = ora(`Writing artifacts to ${outputDir}…`).start();
+      try {
+        const reportArtifacts = writeArtifacts(report, resolvedOutputDir, outputFormats);
+        const machineArtifacts = writeMachineArtifacts(report, resolvedOutputDir);
+        artifacts = [...reportArtifacts, ...machineArtifacts];
+        writeSpinner.succeed(`Wrote ${artifacts.length} artifact(s)`);
+      } catch (err) {
+        writeSpinner.fail(`Could not write artifacts: ${String(err)}`);
+      }
+    } else {
+      console.log(chalk.dim('  [safe mode] Artifact writing skipped — analysis only.\n'));
+    }
+
+    // ── Auto-fix notice ────────────────────────────────────────────────────────
+    if (!applyFixes) {
+      const autoFixable = codeSuggestions.filter((s) => s.change.automated);
+      if (autoFixable.length > 0) {
+        console.log('');
+        console.log(
+          chalk.bold(`  ${chalk.green(String(autoFixable.length))} location(s) can be auto-fixed.`),
+        );
+        console.log(
+          chalk.dim(`  Re-run with ${chalk.white('stack-lift apply <path>')} to apply them.`),
+        );
+      }
+    }
+
+    // ── Checklist ──────────────────────────────────────────────────────────────
+    printChecklist(report, packageReplacements, artifacts);
+
+    // ── Done ───────────────────────────────────────────────────────────────────
+    rollbackManager?.commit();
+    updateSession(resolved, { phase: 'done', decisions });
+    console.log(chalk.bold.green('  ✔ Migration plan complete.\n'));
+
+    return { report, decisions, artifacts };
+  } catch (err) {
+    if (rollbackManager) {
+      const rollbackResult = rollbackManager.rollback(isDryRun);
+      console.log('');
+      if (rollbackResult.success) {
+        console.log(chalk.yellow(`  ↩ Auto-rollback: ${rollbackResult.message}`));
+      } else {
+        console.log(chalk.red(`  ✗ Auto-rollback failed: ${rollbackResult.message}`));
+        if (rollbackResult.recoveryInstructions) {
+          console.log(
+            chalk.dim(`  Recovery: run manually: ${rollbackResult.recoveryInstructions}`),
+          );
+        }
+      }
+    }
+    throw err;
   }
-
-  // ── Checklist ──────────────────────────────────────────────────────────────
-  printChecklist(report, packageReplacements, artifacts);
-
-  // ── Done ───────────────────────────────────────────────────────────────────
-  updateSession(resolved, { phase: 'done', decisions });
-  console.log(chalk.bold.green('  ✔ Migration plan complete.\n'));
-
-  return { report, decisions, artifacts };
 }
