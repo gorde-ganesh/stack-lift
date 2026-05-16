@@ -16,6 +16,13 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@stack-lift/angular-provider": ["packages/angular-provider/src/index.ts"],
+      "@stack-lift/core": ["packages/core/src/index.ts"],
+      "@stack-lift/schemas": ["packages/schemas/src/index.ts"],
+      "@stack-lift/shared": ["packages/shared/src/index.ts"]
+    }
   }
 }

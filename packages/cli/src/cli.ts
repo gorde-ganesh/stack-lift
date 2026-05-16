@@ -14,6 +14,7 @@ import {
   clearSession,
   validateBuild,
 } from '@stack-lift/core';
+import { registerAngularProvider } from '@stack-lift/angular-provider';
 import { runInteractive } from './prompts/interaction.js';
 import { installSkill, removeSkill, listSkills, searchSkills } from './skills/manager.js';
 import type {
@@ -25,6 +26,8 @@ import type {
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
+
+registerAngularProvider();
 
 const RISK_COLOR: Record<RiskLevel, ChalkInstance> = {
   low: chalk.green,

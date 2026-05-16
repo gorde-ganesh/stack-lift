@@ -206,6 +206,13 @@ export interface UpgradeStep {
   referenceUrl?: string;
 }
 
+export interface FrameworkProvider {
+  readonly name: Exclude<Framework, 'Unknown'>;
+  readonly supportedVersions: readonly string[];
+  getLatestVersion(): string;
+  getUpgradeSteps(fromVersion: string, toVersion: string): UpgradeStep[];
+}
+
 export interface UpgradePlan {
   framework: Framework;
   fromVersion: string;
