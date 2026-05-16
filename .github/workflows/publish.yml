@@ -1,11 +1,18 @@
 name: Publish
+
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
 
 permissions:
-  contents: write  # required for GitHub Release creation
+  contents: write
   id-token: write  # required for npm provenance
 
 jobs:
@@ -34,6 +41,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Format check
+        run: npm run format:check
+
       - name: Test
         run: npm test
 
@@ -41,15 +51,24 @@ jobs:
         run: npm run build
 
   publish:
-    name: Publish to npm
+    name: Bump, publish, release
     needs: ci
     runs-on: ubuntu-latest
     environment: production
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Use Node.js 20
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
@@ -59,30 +78,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify tag matches package.json version
+      - name: Bump version
+        run: npm version ${{ inputs.bump }} -m "chore: release v%s"
+
+      - name: Push commit and tag
         run: |
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
-            echo "ERROR: package.json version ($PKG_VERSION) does not match tag ($TAG_VERSION)"
-            exit 1
-          fi
-          echo "Version check passed: $PKG_VERSION"
+          git push
+          git push --tags
 
       - name: Build
         run: npm run build
 
       # NPM_TOKEN must be an Automation token (npmjs.com → Access Tokens → Generate → Automation)
-      # Automation tokens bypass OTP/2FA in CI. Classic tokens with 2FA will fail with EOTP.
-      - name: Publish
+      - name: Publish to npm
+        id: publish
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
+        if: steps.publish.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ github.ref_name }} \
-            --title "${{ github.ref_name }}" \
+          VERSION=$(node -p "require('./package.json').version")
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
             --generate-notes
