@@ -31,6 +31,8 @@ export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
 export type Severity = 'low' | 'medium' | 'high';
 
+export type MigrationAutomationLevel = 'automatable' | 'assisted' | 'advisory';
+
 export type BreakingChangeCategory =
   | 'api'
   | 'config'
@@ -186,6 +188,9 @@ export interface BreakingChange {
   before?: string;
   after?: string;
   automated: boolean;
+  /** Automatable rules are safe for stack-lift to apply; assisted/advisory are surfaced for review. */
+  automationLevel?: MigrationAutomationLevel;
+  remediationGuidance?: string;
   severity: Severity;
   fromVersion: string;
   toVersion: string;
@@ -224,6 +229,7 @@ export interface UpgradePlan {
   steps: UpgradeStep[];
   totalBreakingChanges: number;
   totalAutomatedFixes: number;
+  migrationRuleCounts?: Record<MigrationAutomationLevel, number>;
   riskLevel: RiskLevel;
   estimatedEffort: string;
   /** Basis for the effort estimate — always shown so users can calibrate. */

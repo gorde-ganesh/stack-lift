@@ -1,4 +1,27 @@
-import type { UpgradeStep } from '@stack-lift/shared';
+import type { BreakingChange, MigrationAutomationLevel, UpgradeStep } from '@stack-lift/shared';
+
+function inferAutomationLevel(change: BreakingChange): MigrationAutomationLevel {
+  if (change.automationLevel) return change.automationLevel;
+  if (change.automated) return 'automatable';
+  if (change.searchPattern) return 'assisted';
+  return 'advisory';
+}
+
+function normalizeAngularStep(step: UpgradeStep): UpgradeStep {
+  const breakingChanges = step.breakingChanges.map((change) => ({
+    ...change,
+    automationLevel: inferAutomationLevel(change),
+    remediationGuidance: change.remediationGuidance ?? change.after ?? change.description,
+    confidence: change.confidence ?? 'medium',
+  }));
+
+  return {
+    ...step,
+    breakingChanges,
+    automatedFixes: breakingChanges.filter((c) => c.automationLevel === 'automatable' && c.automated)
+      .length,
+  };
+}
 
 const ANGULAR_STEPS: Record<string, UpgradeStep> = {
   '11-12': {
@@ -295,6 +318,22 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
         toVersion: '16',
         category: 'config',
       },
+      {
+        api: 'HttpClientModule -> provideHttpClient()',
+        description:
+          'Standalone bootstrap APIs can replace HttpClientModule with provideHttpClient(), but NgModule bootstraps may need a guided migration',
+        before: "imports: [HttpClientModule]",
+        after: "providers: [provideHttpClient()]",
+        automated: false,
+        automationLevel: 'assisted',
+        severity: 'low',
+        fromVersion: '15',
+        toVersion: '16',
+        category: 'api',
+        searchPattern: 'HttpClientModule',
+        remediationGuidance:
+          'If the app uses bootstrapApplication(), move HttpClient setup to providers with provideHttpClient(); keep HttpClientModule for NgModule-only bootstraps until the module architecture is migrated.',
+      },
     ],
     automatedFixes: 0,
     manualActions: [
@@ -333,7 +372,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
         description: 'New built-in @if replaces *ngIf (old syntax still works but is legacy)',
         before: '<div *ngIf="condition">...</div>',
         after: '@if (condition) { <div>...</div> }',
-        automated: true,
+        automated: false,
+        automationLevel: 'assisted',
         severity: 'low',
         fromVersion: '16',
         toVersion: '17',
@@ -345,7 +385,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
         description: 'New built-in @for replaces *ngFor; requires track expression',
         before: '<li *ngFor="let item of items">{{ item }}</li>',
         after: '@for (item of items; track item.id) { <li>{{ item }}</li> }',
-        automated: true,
+        automated: false,
+        automationLevel: 'assisted',
         severity: 'low',
         fromVersion: '16',
         toVersion: '17',
@@ -357,7 +398,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
         description: 'New built-in @switch replaces *ngSwitch',
         before: '<div [ngSwitch]="value"><span *ngSwitchCase="\'a\'">A</span></div>',
         after: "@switch (value) { @case ('a') { <span>A</span> } }",
-        automated: true,
+        automated: false,
+        automationLevel: 'assisted',
         severity: 'low',
         fromVersion: '16',
         toVersion: '17',
@@ -580,7 +622,7 @@ export function getAngularUpgradeSteps(from: string, to: string): UpgradeStep[] 
   for (let v = fromMajor; v < toMajor; v++) {
     const key = `${v}-${v + 1}`;
     if (ANGULAR_STEPS[key]) {
-      steps.push(ANGULAR_STEPS[key]);
+      steps.push(normalizeAngularStep(ANGULAR_STEPS[key]));
     }
   }
   return steps;

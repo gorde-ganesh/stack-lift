@@ -1,5 +1,12 @@
-import type { StackInfo, UpgradePlan, UpgradeStep, RiskLevel } from '@stack-lift/shared';
+import type {
+  StackInfo,
+  UpgradePlan,
+  UpgradeStep,
+  RiskLevel,
+  MigrationAutomationLevel,
+} from '@stack-lift/shared';
 import { getFrameworkProvider, listFrameworkProviders } from '../providers/registry.js';
+import { hasAutomatedFix } from '../execution/refactor-engine.js';
 
 function majorOf(version: string): string {
   return version.split('.')[0] ?? '';
@@ -15,6 +22,44 @@ function computeRisk(steps: UpgradeStep[]): RiskLevel {
   if (hasHigh) return 'high';
   if (hasMedium || majorSpan >= 3) return 'medium';
   return 'low';
+}
+
+function automationLevelFor(change: UpgradeStep['breakingChanges'][number]): MigrationAutomationLevel {
+  if (change.automationLevel) return change.automationLevel;
+  return change.automated ? 'automatable' : 'assisted';
+}
+
+function normalizeStep(step: UpgradeStep): UpgradeStep {
+  const breakingChanges = step.breakingChanges.map((change) => {
+    const automationLevel = automationLevelFor(change);
+    const hasSafeTransform = automationLevel === 'automatable' && hasAutomatedFix(change.api);
+
+    return {
+      ...change,
+      automated: hasSafeTransform,
+      automationLevel,
+      remediationGuidance: change.remediationGuidance ?? change.after ?? change.description,
+    };
+  });
+
+  return {
+    ...step,
+    breakingChanges,
+    automatedFixes: breakingChanges.filter((c) => c.automationLevel === 'automatable' && c.automated)
+      .length,
+  };
+}
+
+function countMigrationRules(steps: UpgradeStep[]): Record<MigrationAutomationLevel, number> {
+  return steps
+    .flatMap((s) => s.breakingChanges)
+    .reduce<Record<MigrationAutomationLevel, number>>(
+      (counts, change) => {
+        counts[automationLevelFor(change)] += 1;
+        return counts;
+      },
+      { automatable: 0, assisted: 0, advisory: 0 },
+    );
 }
 
 function estimateEffort(
@@ -98,10 +143,11 @@ export function planUpgrade(
   }
 
   validateVersions(framework, fromMajor, toMajor, [...provider.supportedVersions]);
-  const steps: UpgradeStep[] = provider.upgradeSteps(fromMajor, toMajor);
+  const steps: UpgradeStep[] = provider.upgradeSteps(fromMajor, toMajor).map(normalizeStep);
 
   const strategy = steps.length > 1 ? 'incremental' : 'direct';
   const totalBreakingChanges = steps.reduce((n, s) => n + s.breakingChanges.length, 0);
+  const migrationRuleCounts = countMigrationRules(steps);
   const totalAutomatedFixes = steps.reduce((n, s) => n + s.automatedFixes, 0);
   const { effort, basis } = estimateEffort(
     steps,
@@ -117,6 +163,7 @@ export function planUpgrade(
     steps,
     totalBreakingChanges,
     totalAutomatedFixes,
+    migrationRuleCounts,
     riskLevel: computeRisk(steps),
     estimatedEffort: effort,
     effortBasis: basis,

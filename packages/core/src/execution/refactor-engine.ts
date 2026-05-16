@@ -268,6 +268,7 @@ export function applyRefactors(
   const byFile = new Map<string, Set<string>>();
   for (const s of suggestions) {
     if (!s.change.automated) continue;
+    if (s.change.automationLevel !== 'automatable') continue;
     const apis = byFile.get(s.file) ?? new Set<string>();
     apis.add(s.change.api);
     byFile.set(s.file, apis);

@@ -57,6 +57,21 @@ describe('planUpgrade — Angular', () => {
     const plan = planUpgrade(stack, '18');
     expect(['low', 'medium', 'high', 'critical']).toContain(plan.riskLevel);
   });
+
+  it('classifies Angular migration rules by automation level', () => {
+    const stack = detectStack(path.join(fixtures, 'angular-12'));
+    const plan = planUpgrade(stack, '19');
+    const changes = plan.steps.flatMap((s) => s.breakingChanges);
+
+    expect(plan.migrationRuleCounts?.automatable).toBeGreaterThan(0);
+    expect(plan.migrationRuleCounts?.assisted).toBeGreaterThan(0);
+    expect(plan.migrationRuleCounts?.advisory).toBeGreaterThan(0);
+    expect(changes.every((c) => c.automationLevel && c.remediationGuidance)).toBe(true);
+
+    const controlFlow = changes.find((c) => c.api === '*ngFor structural directive');
+    expect(controlFlow?.automationLevel).toBe('assisted');
+    expect(controlFlow?.automated).toBe(false);
+  });
 });
 
 describe('planUpgrade — React', () => {

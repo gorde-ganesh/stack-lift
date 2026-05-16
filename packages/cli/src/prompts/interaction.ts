@@ -865,6 +865,29 @@ export async function runInteractive(
       `Plan ready: ${plan.steps.length} step(s), ${plan.riskLevel} risk, effort ${plan.estimatedEffort}`,
     );
 
+    const ruleCounts = plan.migrationRuleCounts;
+    if (ruleCounts) {
+      console.log(
+        `  ${chalk.dim('Migration rules:')} ${ruleCounts.automatable} automatable, ${ruleCounts.assisted} assisted, ${ruleCounts.advisory} advisory`,
+      );
+    }
+    const assistedMatches = codeSuggestions.filter(
+      (s) => s.change.automationLevel === 'assisted',
+    );
+    if (!ni && assistedMatches.length > 0) {
+      console.log(
+        chalk.yellow(`  ${assistedMatches.length} assisted migration location(s) need review.`),
+      );
+      for (const suggestion of assistedMatches.slice(0, 5)) {
+        console.log(
+          `  ${chalk.dim('-')} ${chalk.bold(suggestion.change.api)} ${chalk.dim(`${suggestion.file}:${suggestion.line ?? '?'}`)}`,
+        );
+      }
+      if (assistedMatches.length > 5) {
+        console.log(chalk.dim(`  ... and ${assistedMatches.length - 5} more in the report.`));
+      }
+    }
+
     const byFile = new Map<string, typeof codeSuggestions>();
     for (const s of codeSuggestions) {
       const list = byFile.get(s.file) ?? [];
@@ -982,7 +1005,9 @@ export async function runInteractive(
 
     // ── Auto-fix notice ────────────────────────────────────────────────────────
     if (!applyFixes) {
-      const autoFixable = codeSuggestions.filter((s) => s.change.automated);
+      const autoFixable = codeSuggestions.filter(
+        (s) => s.change.automated && s.change.automationLevel === 'automatable',
+      );
       if (autoFixable.length > 0) {
         console.log('');
         console.log(

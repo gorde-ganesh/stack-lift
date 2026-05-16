@@ -73,6 +73,11 @@ function printPlanSummary(report: UpgradeReport) {
   console.log(
     `  ${chalk.dim('Breaking chgs ')} ${plan.totalBreakingChanges} (${plan.totalAutomatedFixes} auto-fixable)`,
   );
+  if (plan.migrationRuleCounts) {
+    console.log(
+      `  ${chalk.dim('Rule classes  ')} ${plan.migrationRuleCounts.automatable} automatable, ${plan.migrationRuleCounts.assisted} assisted, ${plan.migrationRuleCounts.advisory} advisory`,
+    );
+  }
   console.log('');
 
   for (const [i, step] of plan.steps.entries()) {
@@ -82,7 +87,10 @@ function printPlanSummary(report: UpgradeReport) {
     for (const bc of step.breakingChanges) {
       const icon = bc.automated ? chalk.green('✔') : chalk.yellow('⚠');
       const conf = bc.confidence ? chalk.dim(` [${bc.confidence} confidence]`) : '';
-      console.log(`    ${icon} ${chalk.bold(bc.api)}: ${bc.description}${conf}`);
+      const automationLevel = bc.automationLevel ?? (bc.automated ? 'automatable' : 'assisted');
+      console.log(
+        `    ${icon} ${chalk.bold(bc.api)}: ${bc.description} [${automationLevel}]${conf}`,
+      );
     }
     if (step.breakingChanges.length === 0) {
       console.log(`    ${chalk.green('✔')} No breaking changes`);

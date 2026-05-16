@@ -30,7 +30,7 @@ const CONFIDENCE_LABEL: Record<string, string> = {
   low: '❓ Low',
 };
 
-function changeTable(changes: BreakingChange[]): string {
+function _changeTable(changes: BreakingChange[]): string {
   if (changes.length === 0) return '_No breaking changes in this step._\n';
 
   const rows = changes.map((c) => {
@@ -43,6 +43,32 @@ function changeTable(changes: BreakingChange[]): string {
     [
       '| Severity | API | Description | Fix | Confidence |',
       '|----------|-----|-------------|-----|-----------|',
+      ...rows,
+    ].join('\n') + '\n'
+  );
+}
+
+const AUTOMATION_LABEL: Record<string, string> = {
+  automatable: 'Automatable',
+  assisted: 'Assisted',
+  advisory: 'Advisory',
+};
+
+function migrationRuleTable(changes: BreakingChange[]): string {
+  if (changes.length === 0) return '_No breaking changes in this step._\n';
+
+  const rows = changes.map((c) => {
+    const automationLevel = c.automationLevel ?? (c.automated ? 'automatable' : 'assisted');
+    const automated = c.automated ? 'safe auto-fix' : AUTOMATION_LABEL[automationLevel];
+    const remediation = c.remediationGuidance ?? c.after ?? c.description;
+    const conf = CONFIDENCE_LABEL[c.confidence ?? 'medium'] ?? CONFIDENCE_LABEL['medium'];
+    return `| ${SEVERITY_EMOJI[c.severity]} | \`${c.api}\` | ${c.description} | ${automated} | ${remediation} | ${conf} |`;
+  });
+
+  return (
+    [
+      '| Severity | API | Description | Fix | Remediation | Confidence |',
+      '|----------|-----|-------------|-----|-------------|-----------|',
       ...rows,
     ].join('\n') + '\n'
   );
@@ -174,6 +200,7 @@ export function generateMarkdownReport(report: UpgradeReport): string {
       `| **Estimated effort** | ${plan.estimatedEffort} |`,
       `| **Effort basis** | ${plan.effortBasis} |`,
       `| **Breaking changes** | ${plan.totalBreakingChanges} (${plan.totalAutomatedFixes} auto-fixable) |`,
+      `| **Migration rules** | ${plan.migrationRuleCounts?.automatable ?? 0} automatable, ${plan.migrationRuleCounts?.assisted ?? 0} assisted, ${plan.migrationRuleCounts?.advisory ?? 0} advisory |`,
       '',
     ].join('\n'),
   );
@@ -218,7 +245,7 @@ export function generateMarkdownReport(report: UpgradeReport): string {
         '',
         '#### Breaking Changes',
         '',
-        changeTable(allChanges),
+        migrationRuleTable(allChanges),
         '',
         buildCodeExamples(allChanges),
         '#### Manual Actions Required',
@@ -428,12 +455,14 @@ function buildFindingsList(report: UpgradeReport) {
       r.suggestions.map((s) => ({
         api: s.change.api,
         automated: s.change.automated,
+        automationLevel: s.change.automationLevel ?? (s.change.automated ? 'automatable' : 'assisted'),
         confidence: s.change.confidence ?? 'medium',
         description: s.change.description,
         evidence: 'source pattern scan',
         file: r.file,
         line: s.line ?? null,
         severity: s.change.severity,
+        remediationGuidance: s.change.remediationGuidance ?? null,
         source: r.file,
         type: 'code_issue',
       })),
@@ -506,9 +535,11 @@ export function generateExecutionJson(report: UpgradeReport, opts?: SerializeOpt
         .map((s) => ({
           api: s.change.api,
           automated: s.change.automated,
+          automationLevel: s.change.automationLevel ?? (s.change.automated ? 'automatable' : 'assisted'),
           confidence: s.change.confidence ?? 'medium',
           description: s.change.description,
           line: s.line ?? null,
+          remediationGuidance: s.change.remediationGuidance ?? null,
           severity: s.change.severity,
         })),
     }));
@@ -616,6 +647,7 @@ export function generatePlanJson(report: UpgradeReport, opts?: SerializeOptions)
     framework: report.stack.framework,
     fromVersion: report.plan.fromVersion,
     generatedAt: resolveTimestamp(report, opts),
+    migrationRuleCounts: report.plan.migrationRuleCounts ?? null,
     riskLevel: report.plan.riskLevel,
     schemaVersion: SCHEMA_VERSION,
     steps: report.plan.steps.map((s) => ({
@@ -624,9 +656,11 @@ export function generatePlanJson(report: UpgradeReport, opts?: SerializeOptions)
         .map((c) => ({
           api: c.api,
           automated: c.automated,
+          automationLevel: c.automationLevel ?? (c.automated ? 'automatable' : 'assisted'),
           category: c.category,
           confidence: c.confidence,
           description: c.description,
+          remediationGuidance: c.remediationGuidance ?? null,
           severity: c.severity,
         })),
       description: s.description,
