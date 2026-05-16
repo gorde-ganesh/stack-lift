@@ -3,6 +3,14 @@
   "version": "0.4.6",
   "description": "AI-powered upgrade assistant for modernizing Angular, React, and legacy frontend codebases",
   "type": "module",
+    "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gorde-ganesh/stack-lift.git"
+  },
+  "homepage": "https://github.com/gorde-ganesh/stack-lift",
+  "bugs": {
+    "url": "https://github.com/gorde-ganesh/stack-lift/issues"
+  },
   "bin": {
     "stack-lift": "./dist/cli.js",
     "skills": "./dist/skills-cli.js"
