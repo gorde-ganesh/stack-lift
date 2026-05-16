@@ -13,7 +13,7 @@ on:
 
 permissions:
   contents: write
-  id-token: write  # required for npm provenance
+  id-token: write
 
 jobs:
   publish:
@@ -22,7 +22,7 @@ jobs:
     environment: production
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -44,7 +44,9 @@ jobs:
         run: npm ci
 
       - name: Bump version
-        run: npm version ${{ inputs.bump }} -m "chore: release v%s"
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: npm version "$BUMP" -m "chore: release v%s"
 
       - name: Push commit and tag
         run: |
@@ -54,7 +56,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      # NPM_TOKEN must be an Automation token (npmjs.com → Access Tokens → Generate → Automation)
       - name: Publish to npm
         id: publish
         run: npm publish --provenance --access public
