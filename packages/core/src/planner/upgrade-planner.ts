@@ -1,13 +1,4 @@
-import {
-  getAngularUpgradeSteps,
-  getAngularLatestVersion,
-  ANGULAR_SUPPORTED_VERSIONS,
-} from '../knowledge/angular.js';
-import {
-  getReactUpgradeSteps,
-  getReactLatestVersion,
-  REACT_SUPPORTED_VERSIONS,
-} from '../knowledge/react.js';
+import { getFrameworkProvider, listFrameworkProviders } from '../providers/registry.js';
 import type { StackInfo, UpgradePlan, UpgradeStep, RiskLevel } from '@stack-lift/shared';
 
 function majorOf(version: string): string {
@@ -57,13 +48,10 @@ function estimateEffort(
 }
 
 function resolveTargetVersion(stack: StackInfo, requestedTarget?: string): string {
-  const { framework } = stack;
-
   if (requestedTarget) return majorOf(requestedTarget);
 
-  if (framework === 'Angular') return getAngularLatestVersion();
-  if (framework === 'React') return getReactLatestVersion();
-  return majorOf(stack.frameworkVersion);
+  const provider = getFrameworkProvider(stack.framework);
+  return provider?.getLatestVersion() ?? majorOf(stack.frameworkVersion);
 }
 
 function validateVersions(
@@ -97,21 +85,17 @@ export function planUpgrade(
   const { framework, frameworkVersion } = stack;
   const fromMajor = majorOf(frameworkVersion);
   const toMajor = resolveTargetVersion(stack, targetVersion);
+  const provider = getFrameworkProvider(framework);
 
-  let steps: UpgradeStep[];
-
-  if (framework === 'Angular') {
-    validateVersions('Angular', fromMajor, toMajor, ANGULAR_SUPPORTED_VERSIONS);
-    steps = getAngularUpgradeSteps(fromMajor, toMajor);
-  } else if (framework === 'React') {
-    validateVersions('React', fromMajor, toMajor, REACT_SUPPORTED_VERSIONS);
-    steps = getReactUpgradeSteps(fromMajor, toMajor);
-  } else {
+  if (!provider) {
+    const supported = listFrameworkProviders().map((p) => p.name).join(', ');
     throw new Error(
-      `Upgrade planning for "${framework}" is not yet supported. Supported: Angular, React`,
+      `Upgrade planning for "${framework}" is not yet supported. Supported: ${supported}`,
     );
   }
 
+  validateVersions(provider.name, fromMajor, toMajor, [...provider.supportedVersions]);
+  const steps = provider.getUpgradeSteps(fromMajor, toMajor);
   const strategy = steps.length > 1 ? 'incremental' : 'direct';
   const totalBreakingChanges = steps.reduce((n, s) => n + s.breakingChanges.length, 0);
   const totalAutomatedFixes = steps.reduce((n, s) => n + s.automatedFixes, 0);

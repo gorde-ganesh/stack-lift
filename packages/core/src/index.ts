@@ -27,6 +27,11 @@ export {
 // Planning
 export { planUpgrade } from './planner/upgrade-planner.js';
 export { analyzeBreakingChanges } from './planner/breaking-change-analyzer.js';
+export {
+  getFrameworkProvider,
+  listFrameworkProviders,
+  registerFrameworkProvider,
+} from './providers/registry.js';
 
 // Execution
 export { applyRefactors, hasAutomatedFix, runDetectors } from './execution/refactor-engine.js';
@@ -47,11 +52,6 @@ export { writeArtifacts, writeMachineArtifacts } from './reporting/artifact-writ
 export { assertSafePath, resolveSafePath } from './path-guard.js';
 
 // Knowledge (re-exported for consumers that need version data)
-export {
-  getAngularUpgradeSteps,
-  getAngularLatestVersion,
-  ANGULAR_SUPPORTED_VERSIONS,
-} from './knowledge/angular.js';
 export {
   getReactUpgradeSteps,
   getReactLatestVersion,

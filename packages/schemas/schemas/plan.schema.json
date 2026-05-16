@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stack-lift.dev/schemas/plan.schema.json",
+  "title": "StackLift Upgrade Plan",
+  "type": "object",
+  "required": ["schemaVersion", "framework", "fromVersion", "toVersion", "steps"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "framework": { "type": "string" },
+    "fromVersion": { "type": "string" },
+    "toVersion": { "type": "string" },
+    "strategy": { "enum": ["direct", "incremental"] },
+    "steps": {
+      "type": "array",
+      "items": { "type": "object" }
+    }
+  },
+  "additionalProperties": true
+}
