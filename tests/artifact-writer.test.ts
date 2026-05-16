@@ -2,11 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { writeArtifacts, writeMachineArtifacts } from '../src/engines/artifact-writer.js';
-import { detectStack } from '../src/engines/stack-detector.js';
-import { planUpgrade } from '../src/engines/upgrade-planner.js';
+import { writeArtifacts, writeMachineArtifacts } from '../packages/core/src/reporting/artifact-writer.js';
+import { detectStack } from '../packages/core/src/detector/stack-detector.js';
+import { planUpgrade } from '../packages/core/src/planner/upgrade-planner.js';
 import { fileURLToPath } from 'node:url';
-import type { UpgradeReport } from '../src/types/index.js';
+import type { UpgradeReport } from '../packages/shared/src/index.js';
+import { registerFrameworkProvider } from '../packages/core/src/providers/registry.js';
+import { angularProvider } from '../packages/angular-provider/src/index.js';
+
+registerFrameworkProvider(angularProvider);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtures = path.join(__dirname, 'fixtures');

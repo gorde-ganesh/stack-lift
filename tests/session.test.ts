@@ -8,8 +8,8 @@ import {
   clearSession,
   newSession,
   updateSession,
-} from '../src/engines/session.js';
-import type { SessionState } from '../src/types/index.js';
+} from '../packages/core/src/orchestration/session.js';
+import type { SessionState } from '../packages/shared/src/index.js';
 
 let tmpDir: string;
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runCommand, executeCommands } from '../src/engines/command-runner.js';
+import { runCommand, executeCommands } from '../packages/core/src/execution/command-runner.js';
 
 // Use node to run cross-platform inline scripts so tests work on Windows and Unix.
 const node = (script: string) => `node -e "${script}"`;
@@ -100,7 +100,7 @@ describe('executeCommands', () => {
   it('stops on first real failure without git backup when a non-zero exit occurs', async () => {
     // We use a real (non-dry-run) run but with commands that do not touch git.
     // createGitBackup runs git commands; to avoid touching the real repo we spy on it.
-    const { createGitBackup, restoreGitBackup } = await import('../src/engines/command-runner.js');
+    const { createGitBackup, restoreGitBackup } = await import('../packages/core/src/execution/command-runner.js');
     // Not mocking here — just confirm the shape of the result from dry-run path.
     const result = await executeCommands({
       projectPath: process.cwd(),

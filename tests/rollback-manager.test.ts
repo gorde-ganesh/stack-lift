@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { RollbackManager } from '../src/engines/rollback-manager.js';
+import { RollbackManager } from '../packages/core/src/execution/rollback-manager.js';
 
-vi.mock('../src/engines/command-runner.js', () => ({
+vi.mock('../packages/core/src/execution/command-runner.js', () => ({
   runCommand: vi.fn(),
 }));
 
-const { runCommand } = await import('../src/engines/command-runner.js');
+const { runCommand } = await import('../packages/core/src/execution/command-runner.js');
 const mockedRun = vi.mocked(runCommand);
 
 const success = { exitCode: 0, stdout: '', stderr: '', durationMs: 0, timedOut: false };

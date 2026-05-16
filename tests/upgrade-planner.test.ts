@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { detectStack } from '../src/engines/stack-detector.js';
-import { planUpgrade } from '../src/engines/upgrade-planner.js';
+import { detectStack } from '../packages/core/src/detector/stack-detector.js';
+import { planUpgrade } from '../packages/core/src/planner/upgrade-planner.js';
+import { registerFrameworkProvider } from '../packages/core/src/providers/registry.js';
+import { angularProvider } from '../packages/angular-provider/src/index.js';
+
+registerFrameworkProvider(angularProvider);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtures = path.join(__dirname, 'fixtures');

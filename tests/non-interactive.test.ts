@@ -16,7 +16,7 @@ vi.mock('@inquirer/prompts', () => ({
 }));
 
 // Mock build validator so tests don't run real shell commands
-vi.mock('../src/engines/build-validator.js', () => ({
+vi.mock('../packages/core/src/validation/build-validator.js', () => ({
   validateBuild: vi.fn().mockResolvedValue([
     { step: 'install', status: 'skipped' },
     { step: 'build', status: 'skipped' },
@@ -24,7 +24,7 @@ vi.mock('../src/engines/build-validator.js', () => ({
 }));
 
 // Mock npm registry calls so tests are fast and deterministic
-vi.mock('../src/engines/npm-registry.js', () => ({
+vi.mock('../packages/core/src/dependency-intelligence/npm-registry.js', () => ({
   getPackageInfoBatch: vi.fn().mockResolvedValue(new Map()),
 }));
 
@@ -46,7 +46,7 @@ afterEach(() => {
 
 describe('runInteractive — non-interactive mode', () => {
   it('completes without prompting when nonInteractive=true', async () => {
-    const { runInteractive } = await import('../src/engines/interaction.js');
+    const { runInteractive } = await import('../packages/cli/src/prompts/interaction.js');
     const { select, confirm } = await import('@inquirer/prompts');
 
     const result = await runInteractive(tmpDir, {
@@ -71,7 +71,7 @@ describe('runInteractive — non-interactive mode', () => {
   });
 
   it('defaults objective to minimal-risk when not provided', async () => {
-    const { runInteractive } = await import('../src/engines/interaction.js');
+    const { runInteractive } = await import('../packages/cli/src/prompts/interaction.js');
     const result = await runInteractive(tmpDir, {
       nonInteractive: true,
       options: { target: '13', outputDir: path.join(tmpDir, 'out') },
@@ -80,7 +80,7 @@ describe('runInteractive — non-interactive mode', () => {
   });
 
   it('writes artifacts to specified outputDir', async () => {
-    const { runInteractive } = await import('../src/engines/interaction.js');
+    const { runInteractive } = await import('../packages/cli/src/prompts/interaction.js');
     const outDir = path.join(tmpDir, 'artifacts');
     await runInteractive(tmpDir, {
       nonInteractive: true,
@@ -92,7 +92,7 @@ describe('runInteractive — non-interactive mode', () => {
   });
 
   it('always writes machine artifacts in non-interactive mode', async () => {
-    const { runInteractive } = await import('../src/engines/interaction.js');
+    const { runInteractive } = await import('../packages/cli/src/prompts/interaction.js');
     const outDir = path.join(tmpDir, 'machine-out');
     await runInteractive(tmpDir, {
       nonInteractive: true,
@@ -106,7 +106,7 @@ describe('runInteractive — non-interactive mode', () => {
   });
 
   it('report contains plan with correct hop', async () => {
-    const { runInteractive } = await import('../src/engines/interaction.js');
+    const { runInteractive } = await import('../packages/cli/src/prompts/interaction.js');
     const result = await runInteractive(tmpDir, {
       nonInteractive: true,
       options: { target: '15', outputFormats: [], outputDir: path.join(tmpDir, 'out') },
@@ -117,8 +117,8 @@ describe('runInteractive — non-interactive mode', () => {
   });
 
   it('session is persisted and marked done after completion', async () => {
-    const { runInteractive } = await import('../src/engines/interaction.js');
-    const { readSession } = await import('../src/engines/session.js');
+    const { runInteractive } = await import('../packages/cli/src/prompts/interaction.js');
+    const { readSession } = await import('../packages/core/src/orchestration/session.js');
     await runInteractive(tmpDir, {
       nonInteractive: true,
       options: { target: '13', outputFormats: [], outputDir: path.join(tmpDir, 'out') },

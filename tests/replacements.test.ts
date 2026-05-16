@@ -3,7 +3,7 @@ import {
   getReplacementEntry,
   getKnownDeprecatedPackages,
   PACKAGE_REPLACEMENTS,
-} from '../src/knowledge/replacements.js';
+} from '../packages/core/src/knowledge/replacements.js';
 
 describe('PACKAGE_REPLACEMENTS knowledge base', () => {
   it('has entries for all known deprecated packages', () => {

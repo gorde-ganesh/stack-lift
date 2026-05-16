@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { detectStack } from '../src/engines/stack-detector.js';
-import { analyzeDependencies } from '../src/engines/dependency-analyzer.js';
-import * as registry from '../src/engines/npm-registry.js';
+import { detectStack } from '../packages/core/src/detector/stack-detector.js';
+import { analyzeDependencies } from '../packages/core/src/dependency-intelligence/dependency-analyzer.js';
+import * as registry from '../packages/core/src/dependency-intelligence/npm-registry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtures = path.join(__dirname, 'fixtures');
