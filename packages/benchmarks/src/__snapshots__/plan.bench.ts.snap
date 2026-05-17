@@ -1,0 +1,66 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`plan benchmarks > plan snapshot matches for angular-12 1`] = `
+{
+  "framework": "Angular",
+  "fromVersion": "12",
+  "riskLevel": "critical",
+  "stepCount": 8,
+  "strategy": "incremental",
+  "toVersion": "20",
+  "totalAutomatedFixes": 2,
+  "totalBreakingChanges": 24,
+}
+`;
+
+exports[`plan benchmarks > plan snapshot matches for angular-16 1`] = `
+{
+  "framework": "Angular",
+  "fromVersion": "16",
+  "riskLevel": "critical",
+  "stepCount": 4,
+  "strategy": "incremental",
+  "toVersion": "20",
+  "totalAutomatedFixes": 0,
+  "totalBreakingChanges": 11,
+}
+`;
+
+exports[`plan benchmarks > plan snapshot matches for angular-18 1`] = `
+{
+  "framework": "Angular",
+  "fromVersion": "18",
+  "riskLevel": "high",
+  "stepCount": 2,
+  "strategy": "incremental",
+  "toVersion": "20",
+  "totalAutomatedFixes": 0,
+  "totalBreakingChanges": 5,
+}
+`;
+
+exports[`plan benchmarks > plan snapshot matches for angular-material-app 1`] = `
+{
+  "framework": "Angular",
+  "fromVersion": "15",
+  "riskLevel": "critical",
+  "stepCount": 5,
+  "strategy": "incremental",
+  "toVersion": "20",
+  "totalAutomatedFixes": 0,
+  "totalBreakingChanges": 14,
+}
+`;
+
+exports[`plan benchmarks > plan snapshot matches for angular-nx-workspace 1`] = `
+{
+  "framework": "Angular",
+  "fromVersion": "17",
+  "riskLevel": "critical",
+  "stepCount": 3,
+  "strategy": "incremental",
+  "toVersion": "20",
+  "totalAutomatedFixes": 0,
+  "totalBreakingChanges": 7,
+}
+`;

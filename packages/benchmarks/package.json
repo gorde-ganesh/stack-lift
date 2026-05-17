@@ -15,7 +15,9 @@
     "build": "tsup",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:benchmarks": "vitest run --config vitest.config.ts",
+    "test:benchmarks:update": "vitest run --config vitest.config.ts --update-snapshots"
   },
   "dependencies": {
     "@stack-lift/angular-provider": "0.5.0",

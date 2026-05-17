@@ -1,0 +1,30 @@
+{
+  "name": "store",
+  "projectType": "application",
+  "root": "apps/store",
+  "sourceRoot": "apps/store/src",
+  "tags": ["scope:store", "type:app"],
+  "targets": {
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "dist/apps/store",
+        "index": "apps/store/src/index.html",
+        "browser": "apps/store/src/main.ts",
+        "tsConfig": "apps/store/tsconfig.app.json"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "apps/store/jest.config.ts"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["apps/store/**/*.ts", "apps/store/**/*.html"]
+      }
+    }
+  }
+}

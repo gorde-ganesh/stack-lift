@@ -15,7 +15,9 @@
     "typecheck": "turbo typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "dev": "pnpm --filter @stack-lift/cli dev"
+    "dev": "pnpm --filter @stack-lift/cli dev",
+    "test:benchmarks": "npm run test:benchmarks --workspace=packages/benchmarks",
+    "test:benchmarks:update": "npm run test:benchmarks:update --workspace=packages/benchmarks"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.59.3",

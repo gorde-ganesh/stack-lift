@@ -1,0 +1,27 @@
+{
+  "name": "shared-ui",
+  "projectType": "library",
+  "root": "libs/shared-ui",
+  "sourceRoot": "libs/shared-ui/src",
+  "tags": ["scope:shared", "type:lib"],
+  "targets": {
+    "build": {
+      "executor": "@nx/angular:package",
+      "options": {
+        "project": "libs/shared-ui/ng-package.json"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "libs/shared-ui/jest.config.ts"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["libs/shared-ui/**/*.ts", "libs/shared-ui/**/*.html"]
+      }
+    }
+  }
+}

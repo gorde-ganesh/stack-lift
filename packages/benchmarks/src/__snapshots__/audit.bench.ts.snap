@@ -1,0 +1,66 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`audit benchmarks > stack snapshot matches for angular-12 1`] = `
+{
+  "buildTool": "Angular CLI",
+  "framework": "Angular",
+  "frameworkVersion": "12.1.0",
+  "hasNxWorkspace": false,
+  "isMonorepo": false,
+  "nxProjectCount": 0,
+  "packageManager": "npm",
+  "testRunner": "Karma",
+}
+`;
+
+exports[`audit benchmarks > stack snapshot matches for angular-16 1`] = `
+{
+  "buildTool": "Angular CLI",
+  "framework": "Angular",
+  "frameworkVersion": "16.2.0",
+  "hasNxWorkspace": false,
+  "isMonorepo": false,
+  "nxProjectCount": 0,
+  "packageManager": "npm",
+  "testRunner": "Karma",
+}
+`;
+
+exports[`audit benchmarks > stack snapshot matches for angular-18 1`] = `
+{
+  "buildTool": "Angular CLI",
+  "framework": "Angular",
+  "frameworkVersion": "18.2.0",
+  "hasNxWorkspace": false,
+  "isMonorepo": false,
+  "nxProjectCount": 0,
+  "packageManager": "npm",
+  "testRunner": undefined,
+}
+`;
+
+exports[`audit benchmarks > stack snapshot matches for angular-material-app 1`] = `
+{
+  "buildTool": "Angular CLI",
+  "framework": "Angular",
+  "frameworkVersion": "15.2.0",
+  "hasNxWorkspace": false,
+  "isMonorepo": false,
+  "nxProjectCount": 0,
+  "packageManager": "npm",
+  "testRunner": "Karma",
+}
+`;
+
+exports[`audit benchmarks > stack snapshot matches for angular-nx-workspace 1`] = `
+{
+  "buildTool": "Angular CLI",
+  "framework": "Angular",
+  "frameworkVersion": "17.3.0",
+  "hasNxWorkspace": true,
+  "isMonorepo": true,
+  "nxProjectCount": 3,
+  "packageManager": "npm",
+  "testRunner": undefined,
+}
+`;
