@@ -6,6 +6,8 @@ import type {
   BuildTool,
   PackageManager,
   TsconfigInfo,
+  WorkspaceInfo,
+  NxProjectEntry,
 } from '@stack-lift/shared';
 
 function readJsonFile(filePath: string): Record<string, unknown> | null {
@@ -252,6 +254,92 @@ function detectIsMonorepo(projectPath: string, pkg: Record<string, unknown>): bo
   return false;
 }
 
+function classifyNxProjectType(
+  projectPath: string,
+  projectRoot: string,
+): NxProjectEntry['type'] {
+  const fullPath = path.join(projectPath, projectRoot);
+  const projectJson = readJsonFile(path.join(fullPath, 'project.json'));
+  if (projectJson) {
+    const pt = projectJson['projectType'] as string | undefined;
+    if (pt === 'application') return 'app';
+    if (pt === 'library') return 'lib';
+  }
+  if (projectRoot.includes('/apps/') || projectRoot.startsWith('apps/')) return 'app';
+  if (projectRoot.includes('/libs/') || projectRoot.startsWith('libs/')) return 'lib';
+  return 'unknown';
+}
+
+function detectNxWorkspace(
+  projectPath: string,
+  pkg: Record<string, unknown>,
+): WorkspaceInfo | undefined {
+  const nxJsonPath = path.join(projectPath, 'nx.json');
+  if (!exists(nxJsonPath)) return undefined;
+
+  const nxJson = readJsonFile(nxJsonPath);
+  const projects: NxProjectEntry[] = [];
+
+  // nx.json v15+ stores projects in projects.json or workspace.json; enumerate via project.json files
+  const workspaceJson = readJsonFile(path.join(projectPath, 'workspace.json'));
+  const projectsMap =
+    ((nxJson?.['projects'] ?? workspaceJson?.['projects']) as Record<
+      string,
+      string | Record<string, unknown>
+    > | null) ?? {};
+
+  for (const [name, val] of Object.entries(projectsMap)) {
+    const root = typeof val === 'string' ? val : (val['root'] as string | undefined) ?? name;
+    const tags =
+      typeof val === 'object' ? ((val['tags'] as string[] | undefined) ?? []) : undefined;
+    projects.push({
+      name,
+      path: root,
+      type: classifyNxProjectType(projectPath, root),
+      ...(tags !== undefined ? { tags } : {}),
+    });
+  }
+
+  // Also scan apps/ and libs/ directories for project.json files (Nx 14+)
+  if (projects.length === 0) {
+    for (const dir of ['apps', 'libs', 'packages']) {
+      const dirPath = path.join(projectPath, dir);
+      if (!exists(dirPath)) continue;
+      try {
+        for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
+          const projectJsonPath = path.join(dirPath, entry.name, 'project.json');
+          if (!exists(projectJsonPath)) continue;
+          const pj = readJsonFile(projectJsonPath);
+          const name = (pj?.['name'] as string) ?? entry.name;
+          const type = dir === 'apps' ? 'app' : dir === 'libs' ? 'lib' : 'unknown';
+          const tags = pj?.['tags'] as string[] | undefined;
+          projects.push({
+            name,
+            path: `${dir}/${entry.name}`,
+            type,
+            ...(tags !== undefined ? { tags } : {}),
+          });
+        }
+      } catch {
+        // ignore fs errors
+      }
+    }
+  }
+
+  const allDeps = {
+    ...((pkg['dependencies'] as Record<string, string> | undefined) ?? {}),
+    ...((pkg['devDependencies'] as Record<string, string> | undefined) ?? {}),
+  };
+  const nxVersion = allDeps['nx'] ? stripRange(allDeps['nx']) : undefined;
+
+  return {
+    isNx: true,
+    ...(nxVersion !== undefined ? { nxVersion } : {}),
+    projects,
+  };
+}
+
 export function detectStack(projectPath: string): StackInfo {
   const resolved = path.resolve(projectPath);
   const pkgPath = path.join(resolved, 'package.json');
@@ -267,6 +355,7 @@ export function detectStack(projectPath: string): StackInfo {
 
   const [framework, frameworkVersion] = detectFramework(deps, devDeps);
   const isMonorepo = detectIsMonorepo(resolved, pkg);
+  const workspaceInfo = isMonorepo ? detectNxWorkspace(resolved, pkg) : undefined;
   const pm = detectPackageManager(resolved);
   let lockfileResult: { versions: Record<string, string>; parsed: boolean };
   if (pm === 'yarn') {
@@ -298,6 +387,7 @@ export function detectStack(projectPath: string): StackInfo {
     lockfileParsed,
     ...(tsconfig !== undefined ? { tsconfig } : {}),
     isMonorepo,
+    ...(workspaceInfo !== undefined ? { workspaceInfo } : {}),
     ...(testRunner !== undefined ? { testRunner } : {}),
   };
 }
