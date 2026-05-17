@@ -16,6 +16,59 @@ describe('detectStack', () => {
     expect(stack.buildTool).toBe('Angular CLI');
   });
 
+  it('detects Angular 16 project', () => {
+    const stack = detectStack(path.join(fixtures, 'angular-16'));
+    expect(stack.framework).toBe('Angular');
+    expect(stack.frameworkVersion).toBe('16.2.0');
+    expect(stack.typescript).toBe('5.1.6');
+    expect(stack.buildTool).toBe('Angular CLI');
+    expect(stack.isMonorepo).toBeFalsy();
+  });
+
+  it('detects Angular 18 project', () => {
+    const stack = detectStack(path.join(fixtures, 'angular-18'));
+    expect(stack.framework).toBe('Angular');
+    expect(stack.frameworkVersion).toBe('18.2.0');
+    expect(stack.typescript).toBe('5.5.2');
+    expect(stack.buildTool).toBe('Angular CLI');
+  });
+
+  it('detects Angular Material project with material and cdk deps', () => {
+    const stack = detectStack(path.join(fixtures, 'angular-material-app'));
+    expect(stack.framework).toBe('Angular');
+    expect(stack.frameworkVersion).toBe('15.2.0');
+    expect(stack.rawDependencies['@angular/material']).toBeDefined();
+    expect(stack.rawDependencies['@angular/cdk']).toBeDefined();
+  });
+
+  it('detects Nx workspace with isMonorepo=true and workspaceInfo', () => {
+    const stack = detectStack(path.join(fixtures, 'angular-nx-workspace'));
+    expect(stack.framework).toBe('Angular');
+    expect(stack.isMonorepo).toBe(true);
+    expect(stack.workspaceInfo).toBeDefined();
+    expect(stack.workspaceInfo?.isNx).toBe(true);
+  });
+
+  it('enumerates Nx workspace projects with correct types', () => {
+    const stack = detectStack(path.join(fixtures, 'angular-nx-workspace'));
+    const projects = stack.workspaceInfo?.projects ?? [];
+    expect(projects.length).toBeGreaterThanOrEqual(3);
+    const apps = projects.filter((p) => p.type === 'app');
+    const libs = projects.filter((p) => p.type === 'lib');
+    expect(apps.length).toBeGreaterThanOrEqual(2);
+    expect(libs.length).toBeGreaterThanOrEqual(1);
+    const names = projects.map((p) => p.name);
+    expect(names).toContain('store');
+    expect(names).toContain('admin');
+    expect(names).toContain('shared-ui');
+  });
+
+  it('Nx projects carry correct path relative to workspace root', () => {
+    const stack = detectStack(path.join(fixtures, 'angular-nx-workspace'));
+    const store = stack.workspaceInfo?.projects.find((p) => p.name === 'store');
+    expect(store?.path).toMatch(/apps[/\\]store/);
+  });
+
   it('detects React 16 project', () => {
     const stack = detectStack(path.join(fixtures, 'react-16'));
     expect(stack.framework).toBe('React');
