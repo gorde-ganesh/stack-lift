@@ -137,6 +137,19 @@ export interface TsconfigInfo {
   emitDecoratorMetadata?: boolean;
 }
 
+export interface NxProjectEntry {
+  name: string;
+  path: string;
+  type: 'app' | 'lib' | 'unknown';
+  tags?: string[];
+}
+
+export interface WorkspaceInfo {
+  isNx: boolean;
+  nxVersion?: string;
+  projects: NxProjectEntry[];
+}
+
 export interface StackInfo {
   framework: Framework;
   frameworkVersion: string;
@@ -155,6 +168,8 @@ export interface StackInfo {
   /** Key compiler options read from tsconfig.json. */
   tsconfig?: TsconfigInfo;
   isMonorepo?: boolean;
+  /** Nx workspace metadata when an Nx workspace is detected. */
+  workspaceInfo?: WorkspaceInfo;
   /** Detected test runner (Karma, Jest, Vitest, Playwright, Cypress). */
   testRunner?: string;
 }
@@ -257,12 +272,43 @@ export interface RefactorResult {
   diff?: string;
 }
 
+export type FailureCategory =
+  | 'peer-dependency-conflict'
+  | 'angular-compiler-incompatibility'
+  | 'builder-config-mismatch'
+  | 'test-runner-breakage'
+  | 'typescript-error'
+  | 'module-not-found'
+  | 'timeout'
+  | 'unknown';
+
+export interface RemediationSuggestion {
+  action: string;
+  command?: string;
+  docsUrl?: string;
+}
+
+export interface FailureDiagnostic {
+  category: FailureCategory;
+  summary: string;
+  detail?: string;
+  remediations: RemediationSuggestion[];
+  confidence: Confidence;
+}
+
+export interface DiagnosticSummary {
+  totalFailures: number;
+  categories: FailureCategory[];
+  diagnostics: FailureDiagnostic[];
+}
+
 export interface BuildValidationResult {
   step: 'install' | 'build' | 'test' | 'lint';
   status: 'success' | 'failed' | 'skipped';
   durationMs?: number;
   output?: string;
   error?: string;
+  diagnostics?: FailureDiagnostic[];
 }
 
 export interface CommandExecutionRecord {
@@ -304,6 +350,8 @@ export interface UpgradeReport {
   commandExecutionStatus?: 'success' | 'failed' | 'rolled-back' | 'dry-run';
   /** Config file migrations detected and optionally applied. */
   configMigrations?: ConfigMigrationResult[];
+  /** Aggregated diagnostics from failed build validation steps. */
+  diagnosticSummary?: DiagnosticSummary;
 }
 
 export interface ConfigMigrationResult {

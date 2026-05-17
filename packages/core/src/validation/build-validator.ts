@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { runCommand } from '../execution/command-runner.js';
+import { classifyBuildFailure } from '../diagnostics/failure-classifier.js';
 import type { BuildValidationResult, PackageManager } from '@stack-lift/shared';
 
 const PM_CMDS: Record<
@@ -68,7 +69,7 @@ async function runStep(
   }
 
   const error = (result.stderr || result.stdout).slice(0, 2000);
-  return {
+  const failed: BuildValidationResult = {
     step,
     status: 'failed',
     durationMs: result.durationMs,
@@ -76,6 +77,8 @@ async function runStep(
       ? `Timed out after ${Math.round(result.durationMs / 1000)}s. ${error}`
       : error,
   };
+  failed.diagnostics = classifyBuildFailure(failed);
+  return failed;
 }
 
 export interface ValidateOptions {

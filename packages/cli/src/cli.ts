@@ -14,6 +14,7 @@ import {
   clearSession,
   validateBuild,
   getApplicableReplacements,
+  buildDiagnosticSummary,
 } from '@stack-lift/core';
 import { registerAngularProvider } from '@stack-lift/angular-provider';
 import { runInteractive } from './prompts/interaction.js';
@@ -52,10 +53,33 @@ function printStackSummary(report: UpgradeReport) {
   console.log(`  ${chalk.dim('Build tool    ')} ${stack.buildTool}`);
   console.log(`  ${chalk.dim('Pkg manager   ')} ${stack.packageManager}`);
   if (stack.nodeVersion) console.log(`  ${chalk.dim('Node version  ')} ${stack.nodeVersion}`);
-  if (stack.isMonorepo)
-    console.log(
-      `  ${chalk.yellow('⚠ Monorepo detected')} — analyze each workspace package separately`,
-    );
+  if (stack.isMonorepo) {
+    if (stack.workspaceInfo?.isNx) {
+      const nxVer = stack.workspaceInfo.nxVersion ? ` v${stack.workspaceInfo.nxVersion}` : '';
+      console.log(`  ${chalk.yellow('⚠ Nx workspace detected')}${nxVer}`);
+      const projects = stack.workspaceInfo.projects;
+      if (projects.length > 0) {
+        const apps = projects.filter((p) => p.type === 'app');
+        const libs = projects.filter((p) => p.type === 'lib');
+        console.log(
+          `    ${chalk.dim('Projects:')} ${apps.length} app(s), ${libs.length} lib(s)`,
+        );
+        for (const p of projects.slice(0, 8)) {
+          const typeTag = p.type === 'app' ? chalk.cyan('[app]') : chalk.dim('[lib]');
+          console.log(`    ${typeTag} ${p.name} ${chalk.dim(`(${p.path})`)}`);
+        }
+        if (projects.length > 8)
+          console.log(`    ${chalk.dim(`… and ${projects.length - 8} more`)}`);
+        console.log(
+          `  ${chalk.dim('Tip:')} Use ${chalk.white('nx migrate')} for Nx-native dependency updates`,
+        );
+      }
+    } else {
+      console.log(
+        `  ${chalk.yellow('⚠ Monorepo detected')} — analyze each workspace package separately`,
+      );
+    }
+  }
   console.log('');
 }
 
@@ -705,7 +729,18 @@ program
             valSpinner.warn(`Build validation: ${failed.length} step(s) failed`);
             for (const r of failed) {
               console.log(chalk.red(`  ✗ ${r.step}: ${(r.error ?? '').split('\n')[0]}`));
+              if (r.diagnostics && r.diagnostics.length > 0) {
+                for (const d of r.diagnostics) {
+                  console.log(chalk.yellow(`    Diagnosis: ${d.summary}`));
+                  if (d.remediations.length > 0) {
+                    const top = d.remediations[0]!;
+                    console.log(chalk.dim(`    Fix: ${top.action}`));
+                    if (top.command) console.log(chalk.dim(`    Command: ${top.command}`));
+                  }
+                }
+              }
             }
+            result.report.diagnosticSummary = buildDiagnosticSummary(buildResults);
           } else {
             valSpinner.succeed('Build validation passed');
           }

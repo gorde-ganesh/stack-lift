@@ -54,6 +54,12 @@ export type { RollbackResult, RollbackStrategy } from './execution/rollback-mana
 // Validation
 export { validateBuild } from './validation/build-validator.js';
 
+// Diagnostics
+export {
+  classifyBuildFailure,
+  buildDiagnosticSummary,
+} from './diagnostics/failure-classifier.js';
+
 // Reporting
 export {
   generateMarkdownReport,

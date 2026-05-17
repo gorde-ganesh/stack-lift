@@ -7,6 +7,7 @@ import { analyzeBreakingChanges } from '../planner/breaking-change-analyzer.js';
 import { applyRefactors } from '../execution/refactor-engine.js';
 import { analyzeConfigMigrations, applyConfigMigrations } from '../migration/config-migrator.js';
 import { generateMarkdownReport, generateJsonReport } from '../reporting/doc-generator.js';
+import { buildDiagnosticSummary } from '../diagnostics/failure-classifier.js';
 import { assertSafePath } from '../path-guard.js';
 import type { AnalyzeOptions, UpgradeReport, StackInfo, UpgradePlan } from '@stack-lift/shared';
 
@@ -52,6 +53,15 @@ export async function runUpgrade(options: AnalyzeOptions): Promise<OrchestratorR
 
   const manualActions = [...new Set(plan.steps.flatMap((s) => s.manualActions))];
 
+  // For Nx workspaces, prepend nx migrate guidance
+  if (stack.workspaceInfo?.isNx) {
+    const nxTarget = plan.toVersion;
+    manualActions.unshift(
+      `Nx workspace detected — run \`nx migrate @angular/core@${nxTarget}\` instead of ng update`,
+      `After nx migrate, run \`nx migrate --run-migrations\` to apply generated migration scripts`,
+    );
+  }
+
   const report: UpgradeReport = {
     stack,
     plan,
@@ -62,6 +72,7 @@ export async function runUpgrade(options: AnalyzeOptions): Promise<OrchestratorR
     buildStatus: 'skipped',
     generatedAt: new Date().toISOString(),
     configMigrations,
+    diagnosticSummary: buildDiagnosticSummary([]),
   };
 
   const markdown = generateMarkdownReport(report);

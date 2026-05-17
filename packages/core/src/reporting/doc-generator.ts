@@ -4,6 +4,7 @@ import type {
   DependencyInfo,
   PeerDepConflict,
   BuildValidationResult,
+  FailureDiagnostic,
 } from '@stack-lift/shared';
 import { SCHEMA_VERSION } from '@stack-lift/schemas';
 
@@ -140,6 +141,37 @@ function buildCodeExamples(changes: BreakingChange[]): string {
   });
 
   return ['### Code Examples', '', ...sections].join('\n');
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  'peer-dependency-conflict': 'Peer Dependency Conflict',
+  'angular-compiler-incompatibility': 'Angular Compiler Error',
+  'builder-config-mismatch': 'Builder Config Mismatch',
+  'test-runner-breakage': 'Test Runner Failure',
+  'typescript-error': 'TypeScript Error',
+  'module-not-found': 'Module Not Found',
+  timeout: 'Build Timeout',
+  unknown: 'Unknown Failure',
+};
+
+function diagnosticsSection(diagnostics: FailureDiagnostic[]): string {
+  if (diagnostics.length === 0) return '';
+
+  const items = diagnostics.map((d) => {
+    const label = CATEGORY_LABEL[d.category] ?? d.category;
+    const conf = CONFIDENCE_LABEL[d.confidence] ?? '';
+    const detail = d.detail ? `\n\n  \`\`\`\n  ${d.detail}\n  \`\`\`` : '';
+    const remediations = d.remediations
+      .map((r) => {
+        const cmd = r.command ? `\n    \`${r.command}\`` : '';
+        const docs = r.docsUrl ? ` — [docs](${r.docsUrl})` : '';
+        return `  - ${r.action}${docs}${cmd}`;
+      })
+      .join('\n');
+    return [`### ${label} (${conf})`, '', `**${d.summary}**${detail}`, '', remediations].join('\n');
+  });
+
+  return ['## Failure Diagnostics', '', ...items, ''].join('\n');
 }
 
 export function generateMarkdownReport(report: UpgradeReport): string {
@@ -375,6 +407,10 @@ export function generateMarkdownReport(report: UpgradeReport): string {
         ].join('\n'),
       );
     }
+  }
+
+  if (report.diagnosticSummary && report.diagnosticSummary.totalFailures > 0) {
+    sections.push(diagnosticsSection(report.diagnosticSummary.diagnostics));
   }
 
   sections.push(
