@@ -8,10 +8,12 @@ on:
 
 jobs:
   ci:
-    name: Lint, typecheck, test, build
-    runs-on: ubuntu-latest
+    name: CI (${{ matrix.os }}, Node ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [18.x, 20.x, 22.x]
 
     steps:
@@ -41,5 +43,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Benchmark tests
+        run: npm run test:benchmarks
+        working-directory: packages/benchmarks
+
       - name: Pack validation
         run: npm pack --dry-run
+        working-directory: packages/cli
