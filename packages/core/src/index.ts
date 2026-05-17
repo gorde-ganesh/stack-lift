@@ -96,4 +96,5 @@ export {
   PACKAGE_REPLACEMENTS,
   getReplacementEntry,
   getKnownDeprecatedPackages,
+  getApplicableReplacements,
 } from './knowledge/replacements.js';

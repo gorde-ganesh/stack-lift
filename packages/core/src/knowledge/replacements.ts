@@ -1,4 +1,4 @@
-import type { ReplacementEntry } from '@stack-lift/shared';
+import type { Framework, ReplacementEntry } from '@stack-lift/shared';
 
 export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
   moment: {
@@ -44,6 +44,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
   protractor: {
     deprecated: 'protractor',
     reason: 'Protractor was deprecated by the Angular team in 2021 and removed from the CLI.',
+    applicableTo: ['Angular'],
     alternatives: [
       {
         name: '@playwright/test',
@@ -72,6 +73,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
   codelyzer: {
     deprecated: 'codelyzer',
     reason: 'Codelyzer is deprecated. The Angular team officially migrated to angular-eslint.',
+    applicableTo: ['Angular'],
     alternatives: [
       {
         name: '@angular-eslint/eslint-plugin',
@@ -118,6 +120,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
   'react-scripts': {
     deprecated: 'react-scripts',
     reason: 'Create React App (react-scripts) is unmaintained as of 2023.',
+    applicableTo: ['React'],
     alternatives: [
       {
         name: 'vite',
@@ -194,6 +197,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     deprecated: '@angular/flex-layout',
     reason:
       '@angular/flex-layout is archived and no longer maintained. CSS Grid/Flexbox has native browser support.',
+    applicableTo: ['Angular'],
     alternatives: [
       {
         name: 'CSS Grid + Flexbox (native)',
@@ -224,6 +228,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     deprecated: 'karma',
     reason:
       'Karma has reached end-of-life (deprecated in 2023). Angular CLI migrated to Web Test Runner for new projects.',
+    applicableTo: ['Angular'],
     alternatives: [
       {
         name: '@web/test-runner',
@@ -343,6 +348,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     deprecated: '@angular-material-components/datetime-picker',
     reason:
       '@angular-material-components/datetime-picker is abandoned and incompatible with Angular 17+.',
+    applicableTo: ['Angular'],
     alternatives: [
       {
         name: '@dhutaryan/ngx-mat-timepicker',
@@ -375,6 +381,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     deprecated: 'rxjs-compat',
     reason:
       'rxjs-compat was a bridge for RxJS 5 → 6. RxJS 7+ has no compat layer — code must use pipeable operators.',
+    applicableTo: ['Angular'],
     alternatives: [
       {
         name: 'rxjs (pipeable operators)',
@@ -391,6 +398,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     deprecated: 'zone.js',
     reason:
       'zone.js is not deprecated but Angular 18 introduces experimental zoneless mode as a superior alternative for performance.',
+    applicableTo: ['Angular'],
     alternatives: [
       {
         name: 'Angular zoneless (experimental)',
@@ -425,6 +433,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     deprecated: 'react-router',
     reason:
       'react-router v5 has significant breaking changes in v6 (removed <Switch>, <Redirect>, hook-based navigation).',
+    applicableTo: ['React', 'Next.js'],
     alternatives: [
       {
         name: 'react-router-dom@6',
@@ -448,6 +457,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
   'react-router-dom': {
     deprecated: 'react-router-dom',
     reason: 'react-router-dom v5 has significant breaking changes in v6.',
+    applicableTo: ['React', 'Next.js'],
     alternatives: [
       {
         name: 'react-router-dom@6',
@@ -495,6 +505,7 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
   'react-query': {
     deprecated: 'react-query',
     reason: 'react-query was renamed to @tanstack/react-query starting from v4.',
+    applicableTo: ['React', 'Next.js'],
     alternatives: [
       {
         name: '@tanstack/react-query',
@@ -514,4 +525,25 @@ export function getReplacementEntry(packageName: string): ReplacementEntry | und
 
 export function getKnownDeprecatedPackages(): string[] {
   return Object.keys(PACKAGE_REPLACEMENTS);
+}
+
+/**
+ * Returns replacement entries applicable to the given framework.
+ * Entries without `applicableTo` are returned for all frameworks.
+ * packageNames is filtered to only those that exist in the registry.
+ */
+export function getApplicableReplacements(
+  framework: Framework,
+  packageNames: string[],
+): Record<string, ReplacementEntry> {
+  const result: Record<string, ReplacementEntry> = {};
+  for (const name of packageNames) {
+    const entry = PACKAGE_REPLACEMENTS[name];
+    if (!entry) continue;
+    const scope = entry.applicableTo;
+    if (!scope || scope.length === 0 || scope.includes(framework as Exclude<Framework, 'Unknown'>)) {
+      result[name] = entry;
+    }
+  }
+  return result;
 }

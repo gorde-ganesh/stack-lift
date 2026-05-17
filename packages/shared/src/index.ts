@@ -87,6 +87,11 @@ export interface ReplacementEntry {
   skipOption: string;
   /** Context questions asked before showing alternatives — answers reorder the list. */
   contextQuestions?: ContextQuestion[];
+  /**
+   * Frameworks this replacement entry applies to.
+   * Absent or empty means universal — relevant for all frameworks.
+   */
+  applicableTo?: Exclude<Framework, 'Unknown'>[];
 }
 
 export interface PackageReplacement {

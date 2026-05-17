@@ -13,6 +13,7 @@ import {
   readSession,
   clearSession,
   validateBuild,
+  getApplicableReplacements,
 } from '@stack-lift/core';
 import { registerAngularProvider } from '@stack-lift/angular-provider';
 import { runInteractive } from './prompts/interaction.js';
@@ -206,6 +207,48 @@ async function runAudit(
         console.log(`  ${chalk.red('●')} ${chalk.bold(d.name)} ${chalk.dim(d.current)}`);
         console.log(`    ${d.reason ?? 'deprecated'}`);
         console.log(`    ${conf} | ${src}`);
+        console.log('');
+      }
+    }
+
+    const applicableReplacements = getApplicableReplacements(
+      stack.framework,
+      deprecated.map((d) => d.name),
+    );
+    const deprecatedWithGuidance = deprecated.filter((d) => applicableReplacements[d.name]);
+    if (deprecatedWithGuidance.length > 0) {
+      console.log(
+        chalk.bold.cyan(`  ⚡ Package Replacement Guidance (${deprecatedWithGuidance.length})`),
+      );
+      for (const d of deprecatedWithGuidance) {
+        const entry = applicableReplacements[d.name]!;
+        const top = entry.alternatives[0];
+        const effortLabel =
+          top?.migrationEffort === 'low'
+            ? chalk.green('low effort')
+            : top?.migrationEffort === 'medium'
+              ? chalk.yellow('medium effort')
+              : chalk.red('high effort');
+        const similarityLabel =
+          top?.apiSimilarity === 'high'
+            ? chalk.green('API similar')
+            : top?.apiSimilarity === 'medium'
+              ? chalk.yellow('some changes')
+              : chalk.red('new API');
+        console.log(`  ${chalk.cyan('→')} ${chalk.bold(d.name)}`);
+        if (top) {
+          console.log(
+            `    Recommended: ${chalk.bold(top.name)} — ${top.description} [${effortLabel}, ${similarityLabel}]`,
+          );
+        }
+        if (entry.alternatives.length > 1) {
+          const others = entry.alternatives
+            .slice(1)
+            .map((a) => a.name)
+            .join(', ');
+          console.log(`    Alternatives: ${chalk.dim(others)}`);
+        }
+        if (top?.notes) console.log(`    ${chalk.dim(top.notes)}`);
         console.log('');
       }
     }

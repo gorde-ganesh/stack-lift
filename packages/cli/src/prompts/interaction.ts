@@ -17,6 +17,7 @@ import {
   computeFingerprint,
   isFingerprintStale,
   getReplacementEntry,
+  getApplicableReplacements,
   REACT_SUPPORTED_VERSIONS,
   getReactLatestVersion,
   validateBuild,
@@ -734,7 +735,11 @@ export async function runInteractive(
   // ── Phase 4: Decisions ─────────────────────────────────────────────────────
   phaseHeader('Phase 4 — Decisions');
 
-  const deprecatedWithReplacements = deprecated.filter((d) => getReplacementEntry(d.name));
+  const applicableEntries = getApplicableReplacements(
+    stack.framework,
+    deprecated.map((d) => d.name),
+  );
+  const deprecatedWithReplacements = deprecated.filter((d) => applicableEntries[d.name]);
   let packageReplacements: PackageReplacement[] = [];
   if (deprecatedWithReplacements.length > 0) {
     if (!ni) console.log('  For each deprecated package, choose a replacement or defer:\n');
@@ -856,6 +861,7 @@ export async function runInteractive(
     const plan = planUpgrade(stack, targetVersion, {
       affectedFiles,
       totalOccurrences: codeSuggestions.length,
+      deprecatedPackageCount: deprecatedWithReplacements.length,
     });
 
     const planSpinner2 = ora(
