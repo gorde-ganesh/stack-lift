@@ -180,7 +180,13 @@ export function runSecurityAudit(
   const cmd = auditCommand(packageManager);
   let raw: string;
   try {
-    raw = execSync(cmd, { cwd: projectPath, stdio: 'pipe', timeout: 30000 }).toString();
+    raw = execSync(cmd, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      // shell required on Windows where npm/pnpm/yarn are .cmd scripts
+      shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh',
+      timeout: 30000,
+    });
   } catch (err) {
     raw = (err as { stdout?: Buffer; stderr?: Buffer }).stdout?.toString() ?? '';
     if (!raw) return [];

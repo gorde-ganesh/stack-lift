@@ -41,7 +41,7 @@ function sha256(content: string): string {
 
 function gitHead(projectPath: string): string | undefined {
   try {
-    return execSync('git rev-parse HEAD', { cwd: projectPath, stdio: 'pipe' }).toString().trim();
+    return execSync('git rev-parse HEAD', { cwd: projectPath, encoding: 'utf-8' }).trim();
   } catch {
     return undefined;
   }

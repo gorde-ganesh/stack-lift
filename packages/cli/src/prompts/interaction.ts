@@ -418,9 +418,10 @@ function buildUpgradeCommands(plan: UpgradePlan, packageManager: PackageManager)
 
 function isGitDirty(projectPath: string): boolean {
   try {
-    const output = execSync('git status --porcelain', { cwd: projectPath, stdio: 'pipe' })
-      .toString()
-      .trim();
+    const output = execSync('git status --porcelain', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    }).trim();
     return output.length > 0;
   } catch {
     return false;
@@ -435,10 +436,8 @@ function createBackupManager(projectPath: string, strategy: BackupStrategy): Rol
     if (strategy === 'branch') {
       const originalBranch = execSync('git rev-parse --abbrev-ref HEAD', {
         cwd: projectPath,
-        stdio: 'pipe',
-      })
-        .toString()
-        .trim();
+        encoding: 'utf-8',
+      }).trim();
       execSync('git checkout -b upgrade/stack-lift', { cwd: projectPath, stdio: 'pipe' });
       manager.setBackup('upgrade/stack-lift', 'branch', originalBranch);
       console.log(chalk.green('  ✔ Created branch: upgrade/stack-lift'));
