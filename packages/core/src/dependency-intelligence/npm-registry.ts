@@ -137,23 +137,29 @@ export async function getPackageInfoBatch(
   concurrency = 8,
 ): Promise<Map<string, RegistryPackageInfo | null>> {
   const results = new Map<string, RegistryPackageInfo | null>();
-  const chunks: string[][] = [];
+  if (packageNames.length === 0) return results;
 
-  for (let i = 0; i < packageNames.length; i += concurrency) {
-    chunks.push(packageNames.slice(i, i + concurrency));
-  }
+  // True sliding-window concurrency: keep `concurrency` workers running until
+  // all items are consumed, so we never wait for a slow request before starting
+  // the next one (unlike chunk-based Promise.all).
+  const queue = [...packageNames];
+  let queueIndex = 0;
 
-  for (const chunk of chunks) {
-    const settled = await Promise.allSettled(
-      chunk.map(async (name) => ({ name, info: await getPackageInfo(name) })),
-    );
-    for (const r of settled) {
-      if (r.status === 'fulfilled') {
-        results.set(r.value.name, r.value.info);
+  async function worker() {
+    while (queueIndex < queue.length) {
+      const name = queue[queueIndex++];
+      if (!name) continue;
+      try {
+        const info = await getPackageInfo(name);
+        results.set(name, info);
+      } catch {
+        results.set(name, null);
       }
     }
   }
 
+  const workerCount = Math.min(concurrency, packageNames.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
   return results;
 }
 
