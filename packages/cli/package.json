@@ -1,6 +1,9 @@
 {
   "name": "@stack-lift/cli",
   "version": "0.5.0",
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "bin": {
     "stack-lift": "./dist/cli.js",
