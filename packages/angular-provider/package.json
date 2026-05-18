@@ -1,6 +1,6 @@
 {
   "name": "@stack-lift/angular-provider",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "files": [
     "dist"
   ],
@@ -20,8 +20,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@stack-lift/core": "0.5.1",
-    "@stack-lift/shared": "0.5.1"
+    "@stack-lift/core": "0.5.2",
+    "@stack-lift/shared": "0.5.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

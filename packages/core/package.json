@@ -1,6 +1,6 @@
 {
   "name": "@stack-lift/core",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "files": [
     "dist"
   ],
@@ -20,8 +20,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@stack-lift/schemas": "0.5.1",
-    "@stack-lift/shared": "0.5.1",
+    "@stack-lift/schemas": "0.5.2",
+    "@stack-lift/shared": "0.5.2",
     "semver": "^7.6.0",
     "ts-morph": "^28.0.0"
   },
