@@ -67,16 +67,21 @@ function estimateEffort(
   affectedFileCount?: number,
   totalOccurrences?: number,
   deprecatedPackageCount?: number,
+  configMigrationCount?: number,
+  testRunnerMigration?: boolean,
 ): { effort: string; basis: string } {
   const totalChanges = steps.flatMap((s) => s.breakingChanges).length;
   const manualCount = steps.flatMap((s) => s.manualActions).length;
   const pkgCount = deprecatedPackageCount ?? 0;
+  const configCount = configMigrationCount ?? 0;
 
   const filePart = affectedFileCount !== undefined ? `, ${affectedFileCount} affected file(s)` : '';
   const occPart =
     totalOccurrences !== undefined ? `, ${totalOccurrences} occurrence(s) in source` : '';
-  const pkgPart = pkgCount > 0 ? `, ${pkgCount} deprecated package replacement(s)` : '';
-  const basis = `${totalChanges} catalogued breaking changes, ${manualCount} manual actions across ${steps.length} hop(s)${filePart}${occPart}${pkgPart} — does not account for test coverage or CI complexity`;
+  const pkgPart = pkgCount > 0 ? `, ${pkgCount} package replacement(s)` : '';
+  const configPart = configCount > 0 ? `, ${configCount} config migration(s)` : '';
+  const testPart = testRunnerMigration ? ', test runner migration' : '';
+  const basis = `${totalChanges} catalogued breaking changes, ${manualCount} manual actions across ${steps.length} hop(s)${filePart}${occPart}${pkgPart}${configPart}${testPart} — does not account for test coverage or CI complexity`;
 
   const sizeMultiplier =
     (affectedFileCount ?? 0) > 100 || (totalOccurrences ?? 0) > 200
@@ -85,7 +90,7 @@ function estimateEffort(
         ? 1.5
         : 1;
 
-  const baseScore = totalChanges + manualCount * 0.5 + pkgCount * 0.75;
+  const baseScore = totalChanges + manualCount * 0.5 + pkgCount * 0.75 + configCount * 0.5;
   const scaledScore = baseScore * sizeMultiplier;
 
   if (scaledScore === 0 && manualCount <= 2) return { effort: '1–2 hours', basis };
@@ -129,7 +134,13 @@ function validateVersions(
 export function planUpgrade(
   stack: StackInfo,
   targetVersion?: string,
-  sizeHint?: { affectedFiles?: number; totalOccurrences?: number; deprecatedPackageCount?: number },
+  sizeHint?: {
+    affectedFiles?: number;
+    totalOccurrences?: number;
+    deprecatedPackageCount?: number;
+    configMigrationCount?: number;
+    testRunnerMigration?: boolean;
+  },
 ): UpgradePlan {
   const { framework, frameworkVersion } = stack;
   const fromMajor = majorOf(frameworkVersion);
@@ -157,6 +168,8 @@ export function planUpgrade(
     sizeHint?.affectedFiles,
     sizeHint?.totalOccurrences,
     sizeHint?.deprecatedPackageCount,
+    sizeHint?.configMigrationCount,
+    sizeHint?.testRunnerMigration,
   );
 
   return {

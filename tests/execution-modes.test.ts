@@ -41,8 +41,8 @@ let tmpDir: string;
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-lift-modes-'));
   const src = path.join(fixtures, 'angular-12');
-  for (const f of fs.readdirSync(src)) {
-    fs.copyFileSync(path.join(src, f), path.join(tmpDir, f));
+  for (const f of fs.readdirSync(src, { withFileTypes: true })) {
+    if (f.isFile()) fs.copyFileSync(path.join(src, f.name), path.join(tmpDir, f.name));
   }
   mockValidateBuild.mockClear();
 });

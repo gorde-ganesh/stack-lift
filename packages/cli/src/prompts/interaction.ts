@@ -9,6 +9,7 @@ import {
   planUpgrade,
   analyzeBreakingChanges,
   applyRefactors,
+  analyzeConfigMigrations,
   applyConfigMigrations,
   writeArtifacts,
   writeMachineArtifacts,
@@ -62,9 +63,10 @@ function phaseHeader(label: string) {
   divider();
 }
 
+const IGNORE_DIRS = new Set(['node_modules', 'dist', 'build', '.git', '.angular', 'coverage']);
+
 function countOccurrences(projectPath: string, packageName: string): number {
   const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.html']);
-  const IGNORE_DIRS = new Set(['node_modules', 'dist', 'build', '.git', '.angular', 'coverage']);
   let count = 0;
 
   function walk(dir: string) {
@@ -96,8 +98,84 @@ function countOccurrences(projectPath: string, packageName: string): number {
   return count;
 }
 
+function countSpecFiles(projectPath: string): number {
+  let count = 0;
+  function walk(dir: string) {
+    let entries: fs.Dirent<string>[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true, encoding: 'utf8' });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        if (!IGNORE_DIRS.has(e.name)) walk(path.join(dir, e.name));
+      } else if (
+        e.name.endsWith('.spec.ts') ||
+        e.name.endsWith('.spec.js') ||
+        e.name.endsWith('.test.ts') ||
+        e.name.endsWith('.test.js')
+      ) {
+        count++;
+      }
+    }
+  }
+  walk(projectPath);
+  return count;
+}
+
+function detectPackageUsage(
+  projectPath: string,
+  pkg: string,
+): { inUse: boolean; evidence: string; occurrences: number } {
+  switch (pkg) {
+    case 'karma': {
+      const hasConf =
+        fs.existsSync(path.join(projectPath, 'karma.conf.js')) ||
+        fs.existsSync(path.join(projectPath, 'karma.conf.ts'));
+      const specCount = countSpecFiles(projectPath);
+      const inUse = hasConf || specCount > 0;
+      const parts = [
+        hasConf && 'karma.conf.js found',
+        specCount > 0 && `${specCount} spec file(s)`,
+      ].filter(Boolean);
+      return {
+        inUse,
+        evidence: inUse ? parts.join(', ') : 'no karma.conf.js or spec files detected',
+        occurrences: specCount,
+      };
+    }
+    case 'tslint': {
+      const hasConfig = fs.existsSync(path.join(projectPath, 'tslint.json'));
+      return {
+        inUse: hasConfig,
+        evidence: hasConfig ? 'tslint.json found' : 'no tslint.json found',
+        occurrences: hasConfig ? 1 : 0,
+      };
+    }
+    case 'codelyzer': {
+      const hasTslint = fs.existsSync(path.join(projectPath, 'tslint.json'));
+      const occ = countOccurrences(projectPath, 'codelyzer');
+      return {
+        inUse: hasTslint || occ > 0,
+        evidence: hasTslint ? 'tslint.json found (codelyzer rules)' : `${occ} occurrence(s) in source`,
+        occurrences: occ,
+      };
+    }
+    default: {
+      const occ = countOccurrences(projectPath, pkg);
+      return {
+        inUse: occ > 0,
+        evidence: occ > 0 ? `${occ} occurrence(s) in source` : 'not found in source',
+        occurrences: occ,
+      };
+    }
+  }
+}
+
 function versionTargets(
   stack: StackInfo,
+  objective?: MigrationObjective,
 ): Array<{ version: string; label: string; effort: string; recommended: boolean }> {
   const from = parseInt(stack.frameworkVersion.split('.')[0] ?? '0', 10);
   const latest =
@@ -131,6 +209,11 @@ function versionTargets(
       effort,
       recommended,
     });
+  }
+
+  // For minimal-risk: only expose the next safe hop to keep the plan conservative
+  if (objective === 'minimal-risk' && targets.length > 1) {
+    return [targets[0]!];
   }
 
   return targets;
@@ -187,7 +270,7 @@ async function askObjective(): Promise<MigrationObjective> {
 }
 
 async function askTargetVersion(stack: StackInfo, objective: MigrationObjective): Promise<string> {
-  const targets = versionTargets(stack);
+  const targets = versionTargets(stack, objective);
   if (targets.length === 0) {
     console.log(
       chalk.green(
@@ -197,20 +280,21 @@ async function askTargetVersion(stack: StackInfo, objective: MigrationObjective)
     return stack.frameworkVersion.split('.')[0] ?? stack.frameworkVersion;
   }
 
-  // Pre-select based on objective
-  let defaultIdx = targets.findIndex((t) => t.recommended);
-  if (objective === 'minimal-risk') {
-    defaultIdx = 0; // next hop only
+  // For minimal-risk with only one target, auto-select without prompting
+  if (objective === 'minimal-risk' && targets.length === 1) {
+    const only = targets[0]!;
+    console.log(
+      `  ${chalk.dim('Target   ')}  ${chalk.cyan(`${stack.framework} ${only.version}`)} ${chalk.dim('(conservative — 1 hop for minimal-risk)')}`,
+    );
+    return only.version;
   }
+
+  const defaultIdx = targets.findIndex((t) => t.recommended);
 
   return select<string>({
     message: `Target ${stack.framework} version?`,
-    choices: targets.map((t, i) => ({
-      name: t.label,
-      value: t.version,
-      ...(i === defaultIdx ? {} : {}),
-    })),
-    default: targets[defaultIdx]?.version,
+    choices: targets.map((t) => ({ name: t.label, value: t.version })),
+    default: targets[Math.max(0, defaultIdx)]?.version,
   });
 }
 
@@ -232,6 +316,7 @@ async function askPackageReplacements(
   deprecatedNames: string[],
   nonInteractive: boolean,
   autoChoices?: Record<string, string>,
+  objective?: MigrationObjective,
 ): Promise<PackageReplacement[]> {
   const replacements: PackageReplacement[] = [];
 
@@ -239,11 +324,21 @@ async function askPackageReplacements(
     const entry = getReplacementEntry(pkg);
     if (!entry) continue;
 
-    const occurrences = countOccurrences(stack.projectPath, pkg);
-    const effortStr =
-      occurrences === 0
-        ? chalk.dim('(not found in source — may be transitive)')
-        : chalk.yellow(`found in ${occurrences} location(s)`);
+    const usage = detectPackageUsage(stack.projectPath, pkg);
+    const { occurrences } = usage;
+
+    // Skip packages not detected in use for minimal-risk objective
+    if (objective === 'minimal-risk' && !usage.inUse) {
+      console.log(
+        `  ${chalk.dim('○')} ${chalk.bold(pkg)} — ${chalk.dim(`skipped (${usage.evidence}, minimal-risk objective)`)}`,
+      );
+      replacements.push({ package: pkg, chosen: null, occurrences: 0 });
+      continue;
+    }
+
+    const effortStr = usage.inUse
+      ? chalk.yellow(usage.evidence)
+      : chalk.dim(`(${usage.evidence} — may be transitive)`);
 
     console.log('');
     console.log(`  ${chalk.bold.red('⚠')} ${chalk.bold(pkg)} — ${entry.reason}`);
@@ -836,6 +931,8 @@ export async function runInteractive(
       stack,
       deprecatedWithReplacements.map((d) => d.name),
       ni,
+      undefined,
+      objective,
     );
   }
 
@@ -947,10 +1044,19 @@ export async function runInteractive(
     codeSpinner.succeed(`Found ${codeSuggestions.length} code location(s) to review`);
 
     const affectedFiles = new Set(codeSuggestions.map((s) => s.file)).size;
+    const chosenReplacements = packageReplacements.filter((r) => r.chosen !== null).length;
+    const configAnalysis = analyzeConfigMigrations(resolved, planUpgrade(stack, targetVersion));
+    const neededConfigMigrations = configAnalysis.filter((r) => r.needed).length;
+    const testRunnerMigration = packageReplacements.some(
+      (r) => r.chosen !== null && (r.package === 'karma' || r.package === 'jest'),
+    );
+
     const plan = planUpgrade(stack, targetVersion, {
       affectedFiles,
       totalOccurrences: codeSuggestions.length,
-      deprecatedPackageCount: deprecatedWithReplacements.length,
+      deprecatedPackageCount: chosenReplacements,
+      configMigrationCount: neededConfigMigrations,
+      testRunnerMigration,
     });
 
     const planSpinner2 = ora(

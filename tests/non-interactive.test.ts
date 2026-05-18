@@ -34,8 +34,8 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stack-lift-ni-'));
   // Copy angular-12 fixture into tmpDir
   const src = path.join(fixtures, 'angular-12');
-  for (const f of fs.readdirSync(src)) {
-    fs.copyFileSync(path.join(src, f), path.join(tmpDir, f));
+  for (const f of fs.readdirSync(src, { withFileTypes: true })) {
+    if (f.isFile()) fs.copyFileSync(path.join(src, f.name), path.join(tmpDir, f.name));
   }
 });
 
