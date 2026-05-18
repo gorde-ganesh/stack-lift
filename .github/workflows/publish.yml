@@ -55,6 +55,14 @@ jobs:
             npm version "$BUMP" --workspaces --include-workspace-root --no-git-tag-version
           fi
           VERSION=$(node -p "require('./packages/cli/package.json').version")
+          # npm version bumps each package but does not update cross-references between
+          # workspace packages. Fix them so npm install doesn't try to fetch old versions
+          # from the registry.
+          for pkg in schemas shared core angular-provider; do
+            find packages -name "package.json" -not -path "*/node_modules/*" | \
+              xargs sed -i "s|\"@stack-lift/${pkg}\": \"[0-9][^\"]*\"|\"@stack-lift/${pkg}\": \"${VERSION}\"|g"
+          done
+          npm install --package-lock-only
           git add -A
           git commit -m "chore: release v${VERSION}"
           git tag "v${VERSION}"
