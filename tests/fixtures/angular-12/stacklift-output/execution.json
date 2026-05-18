@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "generatedAt": "2026-05-18T11:19:21.835Z",
+  "project": {
+    "framework": "Angular",
+    "targetVersion": "13",
+    "version": "12.1.0"
+  },
+  "schemaVersion": "1.0",
+  "summary": {
+    "applied": 0,
+    "filesModified": 0,
+    "filesScanned": 0,
+    "totalSuggestions": 0
+  }
+}

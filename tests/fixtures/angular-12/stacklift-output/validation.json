@@ -1,0 +1,19 @@
+{
+  "baseline": null,
+  "generatedAt": "2026-05-18T11:19:21.835Z",
+  "postMigration": [],
+  "project": {
+    "framework": "Angular",
+    "targetVersion": "13",
+    "version": "12.1.0"
+  },
+  "regressions": [],
+  "schemaVersion": "1.0",
+  "summary": {
+    "failed": 0,
+    "passed": 0,
+    "regressions": 0,
+    "skipped": 0,
+    "totalSteps": 0
+  }
+}

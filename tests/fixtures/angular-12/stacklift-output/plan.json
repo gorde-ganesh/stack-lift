@@ -1,0 +1,115 @@
+{
+  "buildValidation": null,
+  "decisions": {
+    "autoApply": false,
+    "backupStrategy": "none",
+    "objective": "minimal-risk",
+    "outputDir": "./stacklift-output",
+    "outputFormats": ["markdown"],
+    "packageReplacements": [
+      {
+        "chosen": null,
+        "occurrences": 0,
+        "package": "tslint"
+      },
+      {
+        "chosen": null,
+        "occurrences": 0,
+        "package": "codelyzer"
+      }
+    ],
+    "targetVersion": "13"
+  },
+  "effortBasis": "5 catalogued breaking changes, 6 manual actions across 1 hop(s), 0 affected file(s), 0 occurrence(s) in source — does not account for test coverage or CI complexity",
+  "estimatedEffort": "1–2 days",
+  "framework": "Angular",
+  "fromVersion": "12",
+  "generatedAt": "2026-05-18T11:19:21.835Z",
+  "migrationRuleCounts": {
+    "advisory": 3,
+    "assisted": 1,
+    "automatable": 1
+  },
+  "riskLevel": "high",
+  "schemaVersion": "1.0",
+  "steps": [
+    {
+      "breakingChanges": [
+        {
+          "api": "Date pipe strict ISO 8601",
+          "automated": false,
+          "automationLevel": "advisory",
+          "category": "behavior",
+          "confidence": "medium",
+          "description": "Date pipe now requires valid ISO 8601 date strings",
+          "remediationGuidance": "Date pipe now requires valid ISO 8601 date strings",
+          "severity": "low"
+        },
+        {
+          "api": "IE11 support",
+          "automated": false,
+          "automationLevel": "advisory",
+          "category": "config",
+          "confidence": "medium",
+          "description": "IE11 is no longer supported; remove IE-specific polyfills",
+          "remediationGuidance": "IE11 is no longer supported; remove IE-specific polyfills",
+          "severity": "medium"
+        },
+        {
+          "api": "ModuleWithProviders without generic",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "api",
+          "confidence": "medium",
+          "description": "ModuleWithProviders must have an explicit generic type parameter",
+          "remediationGuidance": "static forRoot(): ModuleWithProviders<MyModule>",
+          "severity": "medium"
+        },
+        {
+          "api": "TestBed.get()",
+          "automated": true,
+          "automationLevel": "automatable",
+          "category": "api",
+          "confidence": "medium",
+          "description": "TestBed.get() is removed. Use TestBed.inject() instead",
+          "remediationGuidance": "const svc = TestBed.inject(MyService);",
+          "severity": "high"
+        },
+        {
+          "api": "ViewEngine",
+          "automated": false,
+          "automationLevel": "advisory",
+          "category": "config",
+          "confidence": "medium",
+          "description": "ViewEngine is fully removed — all code must compile with Ivy",
+          "remediationGuidance": "ViewEngine is fully removed — all code must compile with Ivy",
+          "severity": "high"
+        }
+      ],
+      "description": "Angular 13: ViewEngine removed, IE11 dropped, APF v13, persistentTsConfig",
+      "fromVersion": "12",
+      "manualActions": [
+        "Run: ng update @angular/core@13 @angular/cli@13",
+        "Run: ng update @angular/cdk@13 @angular/material@13 (if used)",
+        "Remove IE11 entries from browserslist",
+        "Remove IE11 polyfills (classlist, web-animations-js) from polyfills.ts",
+        "Replace TestBed.get() with TestBed.inject()",
+        "Add generic type to all ModuleWithProviders usages"
+      ],
+      "npmInstall": [
+        "@angular/core@13",
+        "@angular/cli@13",
+        "@angular/common@13",
+        "@angular/forms@13",
+        "@angular/router@13",
+        "typescript@~4.4.0",
+        "rxjs@~7.4.0",
+        "zone.js@~0.11.4"
+      ],
+      "referenceUrl": "https://angular.dev/update-guide?v=12.0-13.0&l=3",
+      "toVersion": "13"
+    }
+  ],
+  "strategy": "direct",
+  "toVersion": "13"
+}
