@@ -1,6 +1,19 @@
 {
   "name": "@stack-lift/shared",
   "version": "0.5.2",
+  "description": "Shared TypeScript types for StackLift",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gorde-ganesh/stack-lift.git"
+  },
+  "homepage": "https://github.com/gorde-ganesh/stack-lift#readme",
+  "bugs": {
+    "url": "https://github.com/gorde-ganesh/stack-lift/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "files": [
     "dist"
   ],

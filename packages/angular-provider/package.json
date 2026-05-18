@@ -1,6 +1,19 @@
 {
   "name": "@stack-lift/angular-provider",
   "version": "0.5.2",
+  "description": "Angular upgrade step catalogue and framework provider for StackLift",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gorde-ganesh/stack-lift.git"
+  },
+  "homepage": "https://github.com/gorde-ganesh/stack-lift#readme",
+  "bugs": {
+    "url": "https://github.com/gorde-ganesh/stack-lift/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "files": [
     "dist"
   ],
