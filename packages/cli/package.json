@@ -1,8 +1,24 @@
 {
-  "name": "@stack-lift/cli",
+  "name": "stack-lift",
   "version": "0.5.0",
+  "description": "Interactive upgrade copilot for Angular, React, and TypeScript frontends",
+  "keywords": ["angular", "react", "typescript", "migration", "upgrade", "cli", "codemod"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gorde-ganesh/stack-lift.git"
+  },
+  "homepage": "https://github.com/gorde-ganesh/stack-lift#readme",
+  "bugs": {
+    "url": "https://github.com/gorde-ganesh/stack-lift/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "type": "module",
   "bin": {
