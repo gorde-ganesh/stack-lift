@@ -9,6 +9,7 @@ import {
   planUpgrade,
   analyzeBreakingChanges,
   applyRefactors,
+  applyConfigMigrations,
   writeArtifacts,
   writeMachineArtifacts,
   readSession,
@@ -412,6 +413,95 @@ function buildUpgradeCommands(plan: UpgradePlan, packageManager: PackageManager)
   cmds.push(installSync[packageManager]);
 
   return cmds;
+}
+
+// ── Dry-run preview ───────────────────────────────────────────────────────────
+
+function printDryRunPreview(
+  projectPath: string,
+  plan: UpgradePlan,
+  codeSuggestions: ReturnType<typeof analyzeBreakingChanges>,
+): void {
+  console.log('');
+  console.log(chalk.bold.yellow('  ┌─────────────────────────────────────────────┐'));
+  console.log(chalk.bold.yellow('  │          dry-run preview (no writes)         │'));
+  console.log(chalk.bold.yellow('  └─────────────────────────────────────────────┘'));
+
+  // ── Package changes ──────────────────────────────────────────────────────────
+  const allPackages = plan.steps.flatMap((s) => s.npmInstall);
+  if (allPackages.length > 0) {
+    console.log('');
+    console.log(chalk.bold(`  Package changes (${allPackages.length}):`));
+    for (const pkg of allPackages) {
+      console.log(`  ${chalk.cyan('+')} ${pkg}`);
+    }
+  }
+
+  // ── Config file changes ──────────────────────────────────────────────────────
+  const configResults = applyConfigMigrations(projectPath, plan, true);
+  const neededConfigs = configResults.filter((r) => r.needed);
+  if (neededConfigs.length > 0) {
+    console.log('');
+    console.log(chalk.bold(`  Config file changes (${neededConfigs.length}):`));
+    for (const r of neededConfigs) {
+      console.log(`  ${chalk.cyan('~')} ${chalk.underline(r.file)}  — ${chalk.dim(r.description)}`);
+      if (r.diff) {
+        for (const line of r.diff.split('\n')) {
+          if (line.startsWith('-')) console.log(`    ${chalk.red(line)}`);
+          else if (line.startsWith('+')) console.log(`    ${chalk.green(line)}`);
+          else console.log(`    ${chalk.dim(line)}`);
+        }
+      }
+    }
+  }
+
+  // ── Code changes ─────────────────────────────────────────────────────────────
+  const automatableChanges = codeSuggestions.filter(
+    (s) => s.change.automated && s.change.automationLevel === 'automatable',
+  );
+  if (automatableChanges.length > 0) {
+    const dryRunResults = applyRefactors(codeSuggestions, { dryRun: true });
+    if (dryRunResults.length > 0) {
+      console.log('');
+      console.log(chalk.bold(`  Code changes (${dryRunResults.length} file(s)):`));
+      for (const r of dryRunResults) {
+        const relFile = path.relative(projectPath, r.file);
+        console.log(`  ${chalk.cyan('~')} ${chalk.underline(relFile)}`);
+        for (const desc of r.applied ?? []) {
+          console.log(`    ${chalk.dim('→')} ${desc}`);
+        }
+        if (r.diff) {
+          for (const line of r.diff.split('\n').slice(0, 12)) {
+            if (line.startsWith('-')) console.log(`    ${chalk.red(line)}`);
+            else if (line.startsWith('+')) console.log(`    ${chalk.green(line)}`);
+          }
+          const totalLines = r.diff.split('\n').length;
+          if (totalLines > 12) {
+            console.log(chalk.dim(`    … ${totalLines - 12} more line(s) — see the report for full diff`));
+          }
+        }
+      }
+    }
+  }
+
+  // ── Manual steps ─────────────────────────────────────────────────────────────
+  const manualActions = [...new Set(plan.steps.flatMap((s) => s.manualActions))];
+  if (manualActions.length > 0) {
+    console.log('');
+    console.log(chalk.bold(`  Manual steps required (${manualActions.length}):`));
+    for (const action of manualActions) {
+      console.log(`  ${chalk.yellow('□')} ${action}`);
+    }
+  }
+
+  if (allPackages.length === 0 && neededConfigs.length === 0 && automatableChanges.length === 0) {
+    console.log('');
+    console.log(chalk.green('  ✔ No automated changes needed.'));
+  }
+
+  console.log('');
+  console.log(chalk.dim('  [dry-run] Nothing was written. Re-run without --dry-run to apply.'));
+  console.log('');
 }
 
 // ── Git safety ────────────────────────────────────────────────────────────────
@@ -891,6 +981,11 @@ export async function runInteractive(
       if (assistedMatches.length > 5) {
         console.log(chalk.dim(`  ... and ${assistedMatches.length - 5} more in the report.`));
       }
+    }
+
+    // ── Dry-run preview ────────────────────────────────────────────────────────
+    if (isDryRun) {
+      printDryRunPreview(resolved, plan, codeSuggestions);
     }
 
     const byFile = new Map<string, typeof codeSuggestions>();
