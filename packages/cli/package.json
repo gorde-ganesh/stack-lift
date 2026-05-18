@@ -2,7 +2,15 @@
   "name": "stack-lift",
   "version": "0.5.0",
   "description": "Interactive upgrade copilot for Angular, React, and TypeScript frontends",
-  "keywords": ["angular", "react", "typescript", "migration", "upgrade", "cli", "codemod"],
+  "keywords": [
+    "angular",
+    "react",
+    "typescript",
+    "migration",
+    "upgrade",
+    "cli",
+    "codemod"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

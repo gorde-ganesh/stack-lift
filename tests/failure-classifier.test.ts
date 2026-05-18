@@ -5,7 +5,10 @@ import {
 } from '../packages/core/src/diagnostics/failure-classifier.js';
 import type { BuildValidationResult } from '@stack-lift/shared';
 
-function failedResult(error: string, step: BuildValidationResult['step'] = 'build'): BuildValidationResult {
+function failedResult(
+  error: string,
+  step: BuildValidationResult['step'] = 'build',
+): BuildValidationResult {
   return { step, status: 'failed', error };
 }
 

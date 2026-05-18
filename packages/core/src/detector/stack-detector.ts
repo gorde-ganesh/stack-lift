@@ -254,10 +254,7 @@ function detectIsMonorepo(projectPath: string, pkg: Record<string, unknown>): bo
   return false;
 }
 
-function classifyNxProjectType(
-  projectPath: string,
-  projectRoot: string,
-): NxProjectEntry['type'] {
+function classifyNxProjectType(projectPath: string, projectRoot: string): NxProjectEntry['type'] {
   const fullPath = path.join(projectPath, projectRoot);
   const projectJson = readJsonFile(path.join(fullPath, 'project.json'));
   if (projectJson) {
@@ -289,7 +286,7 @@ function detectNxWorkspace(
     > | null) ?? {};
 
   for (const [name, val] of Object.entries(projectsMap)) {
-    const root = typeof val === 'string' ? val : (val['root'] as string | undefined) ?? name;
+    const root = typeof val === 'string' ? val : ((val['root'] as string | undefined) ?? name);
     const tags =
       typeof val === 'object' ? ((val['tags'] as string[] | undefined) ?? []) : undefined;
     projects.push({

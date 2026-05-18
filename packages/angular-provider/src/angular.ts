@@ -18,8 +18,9 @@ function normalizeAngularStep(step: UpgradeStep): UpgradeStep {
   return {
     ...step,
     breakingChanges,
-    automatedFixes: breakingChanges.filter((c) => c.automationLevel === 'automatable' && c.automated)
-      .length,
+    automatedFixes: breakingChanges.filter(
+      (c) => c.automationLevel === 'automatable' && c.automated,
+    ).length,
   };
 }
 
@@ -322,8 +323,8 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
         api: 'HttpClientModule -> provideHttpClient()',
         description:
           'Standalone bootstrap APIs can replace HttpClientModule with provideHttpClient(), but NgModule bootstraps may need a guided migration',
-        before: "imports: [HttpClientModule]",
-        after: "providers: [provideHttpClient()]",
+        before: 'imports: [HttpClientModule]',
+        after: 'providers: [provideHttpClient()]',
         automated: false,
         automationLevel: 'assisted',
         severity: 'low',

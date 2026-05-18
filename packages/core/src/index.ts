@@ -55,10 +55,7 @@ export type { RollbackResult, RollbackStrategy } from './execution/rollback-mana
 export { validateBuild } from './validation/build-validator.js';
 
 // Diagnostics
-export {
-  classifyBuildFailure,
-  buildDiagnosticSummary,
-} from './diagnostics/failure-classifier.js';
+export { classifyBuildFailure, buildDiagnosticSummary } from './diagnostics/failure-classifier.js';
 
 // Reporting
 export {
@@ -78,10 +75,7 @@ export { writeArtifacts, writeMachineArtifacts } from './reporting/artifact-writ
 export { assertSafePath, resolveSafePath } from './path-guard.js';
 
 // Config migration
-export {
-  analyzeConfigMigrations,
-  applyConfigMigrations,
-} from './migration/config-migrator.js';
+export { analyzeConfigMigrations, applyConfigMigrations } from './migration/config-migrator.js';
 
 // Provider API
 export type { FrameworkProvider } from './providers/framework-provider.js';

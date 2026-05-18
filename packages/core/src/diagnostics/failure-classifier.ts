@@ -120,7 +120,8 @@ const RULES: ClassifierRule[] = [
         command: 'npm install karma@latest karma-jasmine@latest karma-chrome-launcher@latest',
       },
       {
-        action: 'Check if the test runner schema changed in angular.json for the new Angular version',
+        action:
+          'Check if the test runner schema changed in angular.json for the new Angular version',
       },
     ],
   },

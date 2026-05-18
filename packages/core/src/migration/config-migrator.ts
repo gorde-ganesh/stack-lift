@@ -52,7 +52,8 @@ const migration_12_13_useDefineForClassFields: ConfigMigration = {
   fromVersion: '12',
   toVersion: '13',
   targetFile: 'tsconfig.json',
-  description: 'Set useDefineForClassFields: false in compilerOptions (required for Angular decorator metadata)',
+  description:
+    'Set useDefineForClassFields: false in compilerOptions (required for Angular decorator metadata)',
 
   check(projectPath: string): boolean {
     const tsconfig = readJson(path.join(projectPath, 'tsconfig.json'));

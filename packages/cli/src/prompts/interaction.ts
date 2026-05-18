@@ -158,7 +158,9 @@ function detectPackageUsage(
       const occ = countOccurrences(projectPath, 'codelyzer');
       return {
         inUse: hasTslint || occ > 0,
-        evidence: hasTslint ? 'tslint.json found (codelyzer rules)' : `${occ} occurrence(s) in source`,
+        evidence: hasTslint
+          ? 'tslint.json found (codelyzer rules)'
+          : `${occ} occurrence(s) in source`,
         occurrences: occ,
       };
     }
@@ -572,7 +574,9 @@ function printDryRunPreview(
           }
           const totalLines = r.diff.split('\n').length;
           if (totalLines > 12) {
-            console.log(chalk.dim(`    … ${totalLines - 12} more line(s) — see the report for full diff`));
+            console.log(
+              chalk.dim(`    … ${totalLines - 12} more line(s) — see the report for full diff`),
+            );
           }
         }
       }
@@ -1072,9 +1076,7 @@ export async function runInteractive(
         `  ${chalk.dim('Migration rules:')} ${ruleCounts.automatable} automatable, ${ruleCounts.assisted} assisted, ${ruleCounts.advisory} advisory`,
       );
     }
-    const assistedMatches = codeSuggestions.filter(
-      (s) => s.change.automationLevel === 'assisted',
-    );
+    const assistedMatches = codeSuggestions.filter((s) => s.change.automationLevel === 'assisted');
     if (!ni && assistedMatches.length > 0) {
       console.log(
         chalk.yellow(`  ${assistedMatches.length} assisted migration location(s) need review.`),

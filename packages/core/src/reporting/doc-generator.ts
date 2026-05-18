@@ -491,7 +491,8 @@ function buildFindingsList(report: UpgradeReport) {
       r.suggestions.map((s) => ({
         api: s.change.api,
         automated: s.change.automated,
-        automationLevel: s.change.automationLevel ?? (s.change.automated ? 'automatable' : 'assisted'),
+        automationLevel:
+          s.change.automationLevel ?? (s.change.automated ? 'automatable' : 'assisted'),
         confidence: s.change.confidence ?? 'medium',
         description: s.change.description,
         evidence: 'source pattern scan',
@@ -571,7 +572,8 @@ export function generateExecutionJson(report: UpgradeReport, opts?: SerializeOpt
         .map((s) => ({
           api: s.change.api,
           automated: s.change.automated,
-          automationLevel: s.change.automationLevel ?? (s.change.automated ? 'automatable' : 'assisted'),
+          automationLevel:
+            s.change.automationLevel ?? (s.change.automated ? 'automatable' : 'assisted'),
           confidence: s.change.confidence ?? 'medium',
           description: s.change.description,
           line: s.line ?? null,

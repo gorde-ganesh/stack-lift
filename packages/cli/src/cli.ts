@@ -61,9 +61,7 @@ function printStackSummary(report: UpgradeReport) {
       if (projects.length > 0) {
         const apps = projects.filter((p) => p.type === 'app');
         const libs = projects.filter((p) => p.type === 'lib');
-        console.log(
-          `    ${chalk.dim('Projects:')} ${apps.length} app(s), ${libs.length} lib(s)`,
-        );
+        console.log(`    ${chalk.dim('Projects:')} ${apps.length} app(s), ${libs.length} lib(s)`);
         for (const p of projects.slice(0, 8)) {
           const typeTag = p.type === 'app' ? chalk.cyan('[app]') : chalk.dim('[lib]');
           console.log(`    ${typeTag} ${p.name} ${chalk.dim(`(${p.path})`)}`);

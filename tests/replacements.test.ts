@@ -100,8 +100,8 @@ describe('getApplicableReplacements — provider-aware filtering', () => {
 
   it('mixes universal and framework-specific entries correctly', () => {
     const result = getApplicableReplacements('Angular', [
-      'moment',       // universal
-      'protractor',   // Angular-only
+      'moment', // universal
+      'protractor', // Angular-only
       'react-scripts', // React-only
     ]);
     expect(result['moment']).toBeDefined();
@@ -110,8 +110,15 @@ describe('getApplicableReplacements — provider-aware filtering', () => {
   });
 
   it('all Angular-specific entries have applicableTo containing Angular', () => {
-    const angularOnly = ['protractor', 'codelyzer', '@angular/flex-layout', 'karma',
-      '@angular-material-components/datetime-picker', 'rxjs-compat', 'zone.js'];
+    const angularOnly = [
+      'protractor',
+      'codelyzer',
+      '@angular/flex-layout',
+      'karma',
+      '@angular-material-components/datetime-picker',
+      'rxjs-compat',
+      'zone.js',
+    ];
     for (const pkg of angularOnly) {
       const entry = getReplacementEntry(pkg);
       expect(entry?.applicableTo, `${pkg} should have applicableTo`).toBeDefined();

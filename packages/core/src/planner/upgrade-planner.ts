@@ -24,7 +24,9 @@ function computeRisk(steps: UpgradeStep[]): RiskLevel {
   return 'low';
 }
 
-function automationLevelFor(change: UpgradeStep['breakingChanges'][number]): MigrationAutomationLevel {
+function automationLevelFor(
+  change: UpgradeStep['breakingChanges'][number],
+): MigrationAutomationLevel {
   if (change.automationLevel) return change.automationLevel;
   return change.automated ? 'automatable' : 'assisted';
 }
@@ -45,8 +47,9 @@ function normalizeStep(step: UpgradeStep): UpgradeStep {
   return {
     ...step,
     breakingChanges,
-    automatedFixes: breakingChanges.filter((c) => c.automationLevel === 'automatable' && c.automated)
-      .length,
+    automatedFixes: breakingChanges.filter(
+      (c) => c.automationLevel === 'automatable' && c.automated,
+    ).length,
   };
 }
 

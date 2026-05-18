@@ -29,10 +29,7 @@ describe('assertSafePath', () => {
 
   it('rejects a path outside allowed roots', () => {
     // /etc or C:\Windows should never be in home/tmp/cwd
-    const outside =
-      process.platform === 'win32'
-        ? 'C:\\Windows\\System32'
-        : '/etc/passwd';
+    const outside = process.platform === 'win32' ? 'C:\\Windows\\System32' : '/etc/passwd';
     // Only throw if the path is genuinely outside all roots
     const home = os.homedir();
     const tmp = os.tmpdir();
@@ -73,8 +70,7 @@ describe('resolveSafePath', () => {
   });
 
   it('throws when path is unsafe', () => {
-    const outside =
-      process.platform === 'win32' ? 'C:\\Windows\\System32' : '/etc/shadow';
+    const outside = process.platform === 'win32' ? 'C:\\Windows\\System32' : '/etc/shadow';
     const home = os.homedir();
     const tmp = os.tmpdir();
     const cwd = process.cwd();

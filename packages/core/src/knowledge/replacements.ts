@@ -541,7 +541,11 @@ export function getApplicableReplacements(
     const entry = PACKAGE_REPLACEMENTS[name];
     if (!entry) continue;
     const scope = entry.applicableTo;
-    if (!scope || scope.length === 0 || scope.includes(framework as Exclude<Framework, 'Unknown'>)) {
+    if (
+      !scope ||
+      scope.length === 0 ||
+      scope.includes(framework as Exclude<Framework, 'Unknown'>)
+    ) {
       result[name] = entry;
     }
   }
