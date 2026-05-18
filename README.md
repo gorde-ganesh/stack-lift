@@ -1,5 +1,9 @@
 # StackLift
 
+[![npm version](https://img.shields.io/npm/v/stack-lift.svg)](https://www.npmjs.com/package/stack-lift)
+[![npm downloads](https://img.shields.io/npm/dm/stack-lift.svg)](https://www.npmjs.com/package/stack-lift)
+[![license](https://img.shields.io/npm/l/stack-lift.svg)](https://github.com/gorde-ganesh/stack-lift/blob/main/LICENSE)
+
 > Interactive upgrade copilot for Angular, React, and TypeScript frontends.
 
 StackLift analyzes legacy frontend projects and guides you through upgrading them — step by step, with choices at every decision point. It asks what you want, shows your options, and writes the artifacts.
