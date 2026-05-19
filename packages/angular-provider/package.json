@@ -1,6 +1,6 @@
 {
   "name": "@stack-lift/angular-provider",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Angular upgrade step catalogue and framework provider for StackLift",
   "license": "MIT",
   "repository": {
@@ -33,8 +33,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@stack-lift/core": "0.5.3",
-    "@stack-lift/shared": "0.5.3"
+    "@stack-lift/core": "0.5.4",
+    "@stack-lift/shared": "0.5.4"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

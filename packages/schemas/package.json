@@ -1,6 +1,6 @@
 {
   "name": "@stack-lift/schemas",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "JSON schema definitions for StackLift upgrade artifacts",
   "license": "MIT",
   "repository": {
