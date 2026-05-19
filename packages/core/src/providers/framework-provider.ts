@@ -4,5 +4,6 @@ export interface FrameworkProvider {
   framework: Exclude<Framework, 'Unknown'>;
   supportedVersions: readonly string[];
   latestVersion(): string;
+  fetchLatestVersion?(): Promise<string>;
   upgradeSteps(from: string, to: string): UpgradeStep[];
 }

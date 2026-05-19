@@ -1,0 +1,47 @@
+---
+description: Use stack-lift CLI to audit and plan Angular/React/TypeScript framework upgrades
+globs: ["package.json", "angular.json", "*.config.ts", "*.config.js"]
+alwaysApply: false
+---
+
+# stack-lift upgrade skill
+
+When the user asks to upgrade, migrate, audit dependencies, or plan a framework version bump for an Angular, React, or TypeScript project — use the `stack-lift` CLI.
+
+## Commands
+
+**Audit** (read-only, always run first):
+```bash
+npx stack-lift audit <project-path>
+```
+Read output from: `<project-path>/stacklift-output/findings.json`
+
+**Plan** (hop-by-hop migration roadmap):
+```bash
+npx stack-lift plan <project-path>
+```
+Read output from: `<project-path>/stacklift-output/plan.json`
+
+**Migrate** (non-interactive for agents):
+```bash
+npx stack-lift migrate <project-path> --non-interactive --target <major-version>
+```
+
+**Apply** (automated code fixes, creates git backup first):
+```bash
+npx stack-lift apply <project-path>
+```
+
+## Agent workflow
+
+1. Run `audit` → read `findings.json`
+2. Run `plan` → read `plan.json`
+3. Present plan to user before running `migrate` or `apply`
+4. After each hop: `npm run build && npm test`
+
+## Key facts
+
+- `audit` and `plan` are always read-only — safe to run without user confirmation
+- `apply` stashes git state before mutating; restores on failure
+- All output artifacts land in `stacklift-output/` — parse JSON files, not terminal output
+- For monorepos: run per workspace, not at the root

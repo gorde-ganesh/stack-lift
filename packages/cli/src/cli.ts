@@ -15,6 +15,7 @@ import {
   validateBuild,
   getApplicableReplacements,
   buildDiagnosticSummary,
+  getFrameworkProvider,
 } from '@stack-lift/core';
 import { registerAngularProvider } from '@stack-lift/angular-provider';
 import { runInteractive } from './prompts/interaction.js';
@@ -193,7 +194,7 @@ function printTerminalReport(report: UpgradeReport) {
 
 async function runAudit(
   projectPath: string,
-  options: { json?: boolean; markdown?: boolean; stable?: boolean; outDir?: string },
+  options: { json?: boolean; markdown?: boolean; stable?: boolean; outDir?: string; artifact?: boolean },
 ) {
   const spinner = ora('Auditing project (read-only)…').start();
   try {
@@ -277,6 +278,16 @@ async function runAudit(
 
     if (peerConflicts.length > 0) {
       console.log(chalk.bold.yellow(`  ⚡ Peer Dependency Conflicts (${peerConflicts.length})`));
+      const unresolvableCount = peerConflicts.filter((c) => c.unresolvable).length;
+      const conflictCount = peerConflicts.length - unresolvableCount;
+      const summaryParts: string[] = [];
+      if (unresolvableCount > 0)
+        summaryParts.push(chalk.red(`${unresolvableCount} unresolvable`));
+      if (conflictCount > 0) summaryParts.push(chalk.yellow(`${conflictCount} version conflicts`));
+      if (summaryParts.length > 0) {
+        console.log(`  ${summaryParts.join(' · ')}  (see findings.json for full list)`);
+        console.log('');
+      }
       for (const c of peerConflicts) {
         const status = c.unresolvable ? chalk.red('UNRESOLVABLE') : chalk.yellow('CONFLICT');
         console.log(
@@ -310,28 +321,35 @@ async function runAudit(
       console.log(chalk.green('  ✔ No issues found. Project looks clean.\n'));
     }
 
+    console.log(chalk.dim(`  Next steps:`));
+    console.log(
+      chalk.dim(`    ${chalk.white('stack-lift plan <path>')}     — hop-by-hop migration roadmap`),
+    );
     console.log(
       chalk.dim(
-        `  Run ${chalk.white('stack-lift migrate <path>')} for interactive guided migration.`,
+        `    ${chalk.white('stack-lift migrate <path>')}  — interactive guided migration`,
       ),
     );
-    console.log('');
 
-    if (options.json || options.markdown) {
-      const plan = planUpgrade(stack, undefined);
-      const report: UpgradeReport = {
-        stack,
-        plan,
-        outdatedDependencies: outdated,
-        peerConflicts,
-        refactorResults: [],
-        manualActions: [],
-        buildStatus: 'skipped',
-        generatedAt: new Date().toISOString(),
-      };
-      const formats: ArtifactFormat[] = [];
-      if (options.json) formats.push('json');
-      if (options.markdown) formats.push('markdown');
+    const prov = getFrameworkProvider(stack.framework);
+    const liveTarget = prov?.fetchLatestVersion
+      ? await prov.fetchLatestVersion()
+      : prov?.latestVersion();
+    const plan = planUpgrade(stack, liveTarget);
+
+    const report: UpgradeReport = {
+      stack,
+      plan,
+      outdatedDependencies: outdated,
+      peerConflicts,
+      refactorResults: [],
+      manualActions: [],
+      buildStatus: 'skipped',
+      generatedAt: new Date().toISOString(),
+    };
+
+    if (options.artifact !== false) {
+      const formats: ArtifactFormat[] = ['markdown', 'json'];
       const outDir = path.resolve(resolved, options.outDir ?? './stacklift-output');
       const artifacts = writeArtifacts(report, outDir, formats);
       const machineArtifacts = writeMachineArtifacts(
@@ -342,8 +360,13 @@ async function runAudit(
       for (const a of [...artifacts, ...machineArtifacts]) {
         console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
       }
-      console.log('');
+      console.log(
+        chalk.dim(
+          `    Artifacts written to ${chalk.white('./stacklift-output/')} — read findings.json for machine output`,
+        ),
+      );
     }
+    console.log('');
   } catch (err) {
     spinner.fail(String(err));
     process.exitCode = 1;
@@ -370,10 +393,11 @@ program
   .option('--markdown', 'Write markdown report to output dir')
   .option('--stable', 'Suppress timestamps in machine artifacts for reproducible CI output')
   .option('--out-dir <dir>', 'Directory for artifact files', './stacklift-output')
+  .option('--artifact', 'Write stacklift-output artifacts (use --no-artifact to suppress)', true)
   .action(
     async (
       projectPath: string,
-      options: { json?: boolean; markdown?: boolean; stable?: boolean; outDir?: string },
+      options: { json?: boolean; markdown?: boolean; stable?: boolean; outDir?: string; artifact?: boolean },
     ) => {
       await runAudit(projectPath, options);
     },
@@ -527,6 +551,7 @@ program
   .option('--json', 'Write JSON artifacts to output dir', false)
   .option('--stable', 'Suppress timestamps in machine artifacts for reproducible CI output', false)
   .option('--out-dir <dir>', 'Directory for artifact files', './stacklift-output')
+  .option('--artifact', 'Write stacklift-output artifacts (use --no-artifact to suppress)', true)
   .action(
     async (
       projectPath: string,
@@ -538,11 +563,21 @@ program
         json: boolean;
         stable: boolean;
         outDir: string;
+        artifact?: boolean;
       },
     ) => {
       try {
         const stack = detectStack(path.resolve(projectPath));
-        const plan = planUpgrade(stack, options.to);
+
+        // Resolve live target from npm registry; fall back to hardcoded provider value
+        const planProv = getFrameworkProvider(stack.framework);
+        const resolvedTarget =
+          options.to ??
+          (planProv?.fetchLatestVersion
+            ? await planProv.fetchLatestVersion()
+            : planProv?.latestVersion());
+
+        const plan = planUpgrade(stack, resolvedTarget);
         const riskFn = RISK_COLOR[plan.riskLevel];
 
         console.log('');
@@ -568,7 +603,7 @@ program
         }
         console.log('');
 
-        if (options.json || options.markdown) {
+        if (options.artifact !== false) {
           const { outdated, peerConflicts } = await analyzeDependencies(stack);
           const report: UpgradeReport = {
             stack,
@@ -580,9 +615,7 @@ program
             buildStatus: 'skipped',
             generatedAt: new Date().toISOString(),
           };
-          const formats: ArtifactFormat[] = [];
-          if (options.markdown) formats.push('markdown');
-          if (options.json) formats.push('json');
+          const formats: ArtifactFormat[] = ['markdown', 'json'];
           const outDir = path.resolve(path.resolve(projectPath), options.outDir);
           const artifacts = writeArtifacts(report, outDir, formats);
           const machineArtifacts = writeMachineArtifacts(

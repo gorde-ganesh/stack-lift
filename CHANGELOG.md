@@ -4,6 +4,23 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ---
 
+## [1.1.0] — 2026-05-19
+
+### Added
+- Angular v21 upgrade hop — `plan` now targets v21 (was capped at v20), covering the full v13→v21 path as 8 hops
+- Dynamic npm version resolution — `fetchLatestVersion()` on the Angular provider fetches the current latest `@angular/core` from the npm registry at runtime, capping at the highest catalogued hop; falls back to the hardcoded version offline
+- Optional `fetchLatestVersion?(): Promise<string>` method added to the `FrameworkProvider` interface for all framework providers
+- `audit` and `plan` now write JSON + markdown artifacts by default — no flags required; agents and CI pipelines can read `stacklift-output/findings.json` and `stacklift-output/plan.json` without opt-in flags
+- `--no-artifact` flag added to `audit` and `plan` to suppress artifact writes for stdout-only pipelines
+- `angular-tippy` detected as abandoned (unmaintained since 2019, requires Angular ^7) with replacement guidance pointing to `@ngneat/helipopper`
+- `ngx-text-diff` detected as abandoned (no releases since 2020, invalid semver, requires Angular ≤13) with replacement guidance pointing to `ngx-diff`
+- Peer conflict summary line in `audit` output showing `N unresolvable · N version conflicts` count before the full conflict list
+- Cursor rules file (`.cursor/rules/stacklift.mdc`) for cross-platform skill discoverability in Cursor IDE
+
+### Changed
+- `audit` CTA now surfaces `stack-lift plan` as the primary next step and shows the artifact output path
+- Bundled `stacklift` Claude Code skill updated with accurate artifact-reading workflow and agent-optimised command examples
+
 ## [1.0.4] — 2026-05-19
 
 ### Fixed

@@ -517,6 +517,49 @@ export const PACKAGE_REPLACEMENTS: Record<string, ReplacementEntry> = {
     ],
     skipOption: 'Keep react-query temporarily',
   },
+
+  'angular-tippy': {
+    deprecated: 'angular-tippy',
+    reason: 'Unmaintained since 2019. Requires Angular ^7 — blocks any upgrade beyond Angular 7.',
+    applicableTo: ['Angular'],
+    alternatives: [
+      {
+        name: '@ngneat/helipopper',
+        description: 'Active Angular tooltip library built on Tippy.js — similar API',
+        apiSimilarity: 'high',
+        migrationEffort: 'low',
+      },
+      {
+        name: 'floating-ui + custom directive',
+        description: 'Framework-agnostic positioning engine — zero Angular dependency',
+        apiSimilarity: 'low',
+        migrationEffort: 'medium',
+      },
+    ],
+    skipOption: 'Keep for now (will block Angular upgrade past v7)',
+  },
+
+  'ngx-text-diff': {
+    deprecated: 'ngx-text-diff',
+    reason:
+      'No releases since 2020. Uses invalid semver (rxjs ~6.3.3) and requires Angular ≤13. Unresolvable on Angular 14+.',
+    applicableTo: ['Angular'],
+    alternatives: [
+      {
+        name: 'ngx-diff',
+        description: 'Active alternative with a similar diff-view component API',
+        apiSimilarity: 'high',
+        migrationEffort: 'low',
+      },
+      {
+        name: 'diff-match-patch',
+        description: 'Google library, no Angular dep — wrap in a custom component',
+        apiSimilarity: 'low',
+        migrationEffort: 'medium',
+      },
+    ],
+    skipOption: 'Keep for now (will block Angular 14+ upgrade)',
+  },
 };
 
 export function getReplacementEntry(packageName: string): ReplacementEntry | undefined {

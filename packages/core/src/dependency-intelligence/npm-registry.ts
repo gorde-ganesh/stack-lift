@@ -40,6 +40,15 @@ const KNOWN_DEPRECATED: Record<string, { reason: string; riskOverride: RiskLevel
     riskOverride: 'medium',
   },
   request: { reason: 'Deprecated Feb 2020. Use node-fetch, got, or axios.', riskOverride: 'high' },
+  'angular-tippy': {
+    reason: 'Unmaintained since 2019. Requires Angular ^7 — blocks any upgrade beyond Angular 7.',
+    riskOverride: 'high',
+  },
+  'ngx-text-diff': {
+    reason:
+      'No releases since 2020. Uses invalid semver (rxjs ~6.3.3) and requires Angular ≤13. Unresolvable on Angular 14+.',
+    riskOverride: 'high',
+  },
 };
 
 const KNOWN_BREAKING = new Set([

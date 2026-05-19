@@ -613,6 +613,37 @@ const ANGULAR_STEPS: Record<string, UpgradeStep> = {
       },
     ],
   },
+  '20-21': {
+    fromVersion: '20',
+    toVersion: '21',
+    description:
+      'Angular 21: framework, CLI, Material/CDK, TypeScript and ecosystem compatibility upgrade',
+    referenceUrl: 'https://angular.dev/update-guide?v=20.0-21.0&l=3',
+    breakingChanges: [],
+    automatedFixes: 0,
+    manualActions: [
+      'Run: ng update @angular/core@21 @angular/cli@21',
+      'Run: ng update @angular/cdk@21 @angular/material@21 (if used)',
+      'Review the Angular 21 update guide for any breaking changes specific to your setup',
+      'Run ng build and ng test after upgrade',
+    ],
+    npmInstall: [
+      '@angular/core@21',
+      '@angular/cli@21',
+      '@angular/common@21',
+      '@angular/forms@21',
+      '@angular/router@21',
+      'typescript@~5.8.0',
+      'rxjs@~7.8.0',
+      'zone.js@~0.15.0',
+    ],
+    conditionalNpmInstall: [
+      {
+        packages: ['@angular/material@21', '@angular/cdk@21'],
+        condition: '@angular/material detected',
+      },
+    ],
+  },
 };
 
 export function getAngularUpgradeSteps(from: string, to: string): UpgradeStep[] {
@@ -630,7 +661,20 @@ export function getAngularUpgradeSteps(from: string, to: string): UpgradeStep[] 
 }
 
 export function getAngularLatestVersion(): string {
-  return '20';
+  return '21';
+}
+
+export async function fetchLatestAngularVersion(): Promise<string> {
+  try {
+    const { getPackageInfo } = await import('@stack-lift/core');
+    const info = await getPackageInfo('@angular/core');
+    if (!info || info.latest === 'unknown') return getAngularLatestVersion();
+    const fetched = parseInt(info.latest.split('.')[0] ?? '0', 10);
+    const maxCatalogued = parseInt(getAngularLatestVersion(), 10);
+    return String(Math.min(fetched, maxCatalogued));
+  } catch {
+    return getAngularLatestVersion();
+  }
 }
 
 export const ANGULAR_SUPPORTED_VERSIONS = [
@@ -645,4 +689,5 @@ export const ANGULAR_SUPPORTED_VERSIONS = [
   '18',
   '19',
   '20',
+  '21',
 ];
