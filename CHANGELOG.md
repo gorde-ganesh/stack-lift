@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ---
 
+## [1.0.1] — 2026-05-19
+
+### Fixed
+- Added "Use with any LLM" section to the npm package README (was present in the GitHub README but missing from the published package)
+- Corrected stale `src/` paths in Contributing section to `packages/core/src/`
+- Fixed architecture file tree: `execution/`, `validation/`, `reporting/`, `diagnostics/`, `migration/` directories now accurate
+- Removed unused root `skills/` directory (shipped skill is in `packages/cli/skills/`)
+
+---
+
 ## [1.0.0] — 2026-05-19
 
 First stable major release. StackLift is production-ready for Angular and React upgrade workflows.
