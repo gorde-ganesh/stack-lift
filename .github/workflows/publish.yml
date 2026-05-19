@@ -49,35 +49,9 @@ jobs:
         env:
           BUMP: ${{ inputs.bump }}
         run: |
-          if [ "$BUMP" = "prerelease" ]; then
-            npm version prerelease --preid=rc --workspaces --include-workspace-root --no-git-tag-version --no-workspaces-update
-          else
-            npm version "$BUMP" --workspaces --include-workspace-root --no-git-tag-version --no-workspaces-update
-          fi
+          node scripts/bump-version.cjs
           VERSION=$(node -p "require('./packages/cli/package.json').version")
-          # npm version bumps each package's own version but does not update cross-references
-          # between workspace packages. Update them with a node script so npm resolves
-          # @stack-lift/* deps from the workspace instead of the registry.
-          node -e "
-            const fs = require('fs'), path = require('path');
-            const newVer = process.argv[1];
-            const scoped = ['schemas', 'shared', 'core', 'angular-provider'];
-            for (const ws of fs.readdirSync('packages')) {
-              const p = path.join('packages', ws, 'package.json');
-              if (!fs.existsSync(p)) continue;
-              const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
-              let changed = false;
-              for (const section of ['dependencies', 'devDependencies', 'peerDependencies']) {
-                if (!pkg[section]) continue;
-                for (const name of scoped) {
-                  const key = '@stack-lift/' + name;
-                  if (pkg[section][key] !== undefined) { pkg[section][key] = newVer; changed = true; }
-                }
-              }
-              if (changed) fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + '\n');
-            }
-          " "$VERSION"
-          # Delete the stale lock file and regenerate so npm ci works on the next run.
+          # Regenerate lockfile so npm ci works on the next run.
           rm package-lock.json
           npm install --ignore-scripts
           git add -A
