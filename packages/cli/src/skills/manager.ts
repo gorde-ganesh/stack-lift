@@ -92,7 +92,7 @@ function installSkillFromLocalPath(sourcePath: string, customDir?: string): void
         );
         process.exit(1);
       }
-      mdFilePath = path.join(resolved, mdFiles[0]);
+      mdFilePath = path.join(resolved, mdFiles[0]!);
     }
     sourceDir = resolved;
     sourceIsDir = true;
