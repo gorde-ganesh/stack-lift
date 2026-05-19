@@ -485,11 +485,13 @@ Each markdown report includes:
 
 ### Current (v0.5)
 
-| Framework  | Upgrade path covered                                              |
-|------------|------------------------------------------------------------------|
-| Angular    | 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20           |
-| React      | 16 → 17 → 18 → 19                                               |
-| TypeScript | 4.x → 5.x                                                       |
+| Framework  | Upgrade path covered                                              | Maturity |
+|------------|------------------------------------------------------------------|----------|
+| Angular    | 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20           | Stable   |
+| React      | 16 → 17 → 18 → 19                                               | Beta     |
+| TypeScript | 4.x → 5.x                                                       | Stable   |
+
+> **React support is in beta.** Detection, planning, and breaking-change catalogues work for React 16–19. The `ReactDOM.render` → `createRoot` and `ReactDOM.hydrate` → `hydrateRoot` AST refactors are implemented but have had less real-world testing than the Angular transforms. Fixes, edge cases, and additional automated refactors are welcome — see [Contributing](#contributing).
 
 ### Detected build tooling
 
@@ -546,6 +548,7 @@ packages/
 ├── cli/src/
 │   ├── cli.ts                      # Commander entry point
 │   ├── skills-cli.ts               # Skills management commands
+│   ├── skills/                     # Skill manager and registry
 │   └── prompts/
 │       └── interaction.ts          # Interactive + non-interactive migrate flow
 ├── core/src/
@@ -553,8 +556,11 @@ packages/
 │   ├── planner/                    # upgrade-planner, breaking-change-analyzer
 │   ├── dependency-intelligence/    # dependency-analyzer, npm-registry
 │   ├── orchestration/              # orchestrator (pipeline entry point), session
-│   ├── execution/                  # refactor-engine, command-runner, build-validator, artifact-writer
-│   ├── reporting/                  # doc-generator
+│   ├── execution/                  # refactor-engine, command-runner, rollback-manager
+│   ├── validation/                 # build-validator
+│   ├── reporting/                  # doc-generator, artifact-writer
+│   ├── diagnostics/                # failure-classifier
+│   ├── migration/                  # config-migrator
 │   ├── providers/                  # FrameworkProvider interface, registry, react-provider
 │   ├── path-guard.ts               # Path traversal protection
 │   └── knowledge/                  # Static breaking-change catalogues per framework
@@ -672,13 +678,13 @@ Loads `.stacklift/session.json`, shows saved phase and decisions, offers to cont
 
 Contributions are welcome. High-value additions:
 
-**Knowledge base entries** (`src/knowledge/`)
+**Knowledge base entries** (`packages/core/src/knowledge/`)
 Breaking changes for framework versions not yet covered. Each entry needs: `api`, `description`, `before`/`after` examples, `automated` flag, `severity`, `searchPattern`, and `referenceUrl`.
 
-**Package replacement entries** (`src/knowledge/replacements.ts`)
+**Package replacement entries** (`packages/core/src/knowledge/replacements.ts`)
 New deprecated packages with structured alternatives: `name`, `apiSimilarity`, `migrationEffort`, `bundleNote`, `notes`.
 
-**Automated refactor patterns** (`src/engines/refactor-engine.ts`)
+**Automated refactor patterns** (`packages/core/src/execution/refactor-engine.ts`)
 AST transforms using ts-morph. Add a new function following the `replaceTestBedGet` pattern and register it in `TRANSFORM_MAP`.
 
 **New framework support**
