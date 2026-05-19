@@ -15,6 +15,7 @@ It works two ways:
 
 - [Overview](#overview)
 - [Installation](#installation)
+- [Use with any LLM](#use-with-any-llm)
 - [Usage](#usage)
 - [CLI commands](#cli-commands)
 - [Interactive migrate flow](#interactive-migrate-flow)
@@ -125,6 +126,62 @@ git clone https://github.com/gorde-ganesh/stack-lift
 cd stack-lift
 npm install && npm run build && npm link
 ```
+
+---
+
+## Use with any LLM
+
+Copy the prompt below and paste it into any AI assistant (Claude, ChatGPT, Gemini, Copilot, etc.) to have it install and run Stack Lift on your project safely.
+
+````
+I want to use Stack Lift (https://github.com/gorde-ganesh/stack-lift) on this local project.
+
+Follow these rules exactly:
+
+1. Check if `stack-lift` is installed globally or locally.
+   Run: `stack-lift --version` then `npx stack-lift --version`
+
+2. If not installed, suggest the safest method:
+   - No install needed: `npx stack-lift <command>`
+   - Global: `npm install -g stack-lift`
+   - Contributor/local build: `npm run build && npm link` (from repo root)
+   Ask me which I prefer before proceeding.
+
+3. Run Stack Lift in audit/dry-run mode ONLY first.
+   Do NOT modify any project files yet.
+   Command: `stack-lift audit . --markdown --out-dir ./stack-lift-report`
+
+4. Detect and report:
+   - Framework name and version (Angular / React / TypeScript)
+   - Package manager and lockfile (npm / yarn / pnpm)
+   - Deprecated packages with confidence scores
+   - Risky or outdated dependencies
+   - Peer conflicts and upgrade blockers
+
+5. For every deprecated package found, suggest multiple alternatives.
+   List lowest code-impact options first.
+
+6. Do NOT create a migration plan yet.
+   Ask me which target version I want to upgrade to first.
+
+7. Show me the exact commands you plan to run before running them.
+   Wait for my confirmation.
+
+8. Create a dedicated branch for all changes:
+   `git checkout -b chore/stack-lift-audit`
+
+9. Generate a markdown report at: `./stack-lift-report/`
+   Do NOT overwrite any existing project files.
+
+Expected output:
+- Current project status (framework, versions, tooling)
+- Upgrade readiness score and risk level
+- Risk list with breaking changes per version hop
+- Deprecated package list with alternative suggestions
+- Suggested target versions (safe hops first)
+- Manual decisions I need to make
+- Path to the generated markdown report
+````
 
 ---
 
