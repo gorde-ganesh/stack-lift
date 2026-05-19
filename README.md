@@ -483,7 +483,7 @@ Each markdown report includes:
 
 ## Supported frameworks
 
-### Current (v0.5)
+### Current (v1.0)
 
 | Framework  | Upgrade path covered                                              | Maturity |
 |------------|------------------------------------------------------------------|----------|

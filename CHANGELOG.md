@@ -4,6 +4,20 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ---
 
+## [1.0.0] — 2026-05-19
+
+First stable major release. StackLift is production-ready for Angular and React upgrade workflows.
+
+### Highlights
+- All core pipeline stages stable: detection, dependency analysis, planning, breaking-change scanning, AST refactors, build validation, artifact writing
+- Angular upgrade path 10 → 20 fully catalogued with per-hop breaking changes and automated fixes
+- React upgrade path 16 → 19 (beta) with planning and two automated refactors
+- Interactive `migrate` flow with session resume, CI/non-interactive mode, and dry-run preview
+- Bundled Claude Code skill — `stack-lift skills add stacklift` installs from the npm package directly
+- Corrected all stale path references in documentation
+
+---
+
 ## [0.5.4] — 2026-05-19
 
 ### Added
