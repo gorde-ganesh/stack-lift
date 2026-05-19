@@ -90,7 +90,9 @@ jobs:
           if [ "${{ inputs.bump }}" = "prerelease" ]; then
             PRERELEASE_FLAG="--prerelease"
           fi
+          # Extract the changelog section for this version
+          NOTES=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
           gh release create "v${VERSION}" \
             --title "v${VERSION}" \
-            --generate-notes \
+            --notes "${NOTES}" \
             $PRERELEASE_FLAG
