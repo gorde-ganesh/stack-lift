@@ -5,6 +5,8 @@ import type {
   PeerDepConflict,
   BuildValidationResult,
   FailureDiagnostic,
+  ArtifactWriterMode,
+  AgentStatus,
 } from '@stack-lift/shared';
 import { SCHEMA_VERSION } from '@stack-lift/schemas';
 
@@ -701,14 +703,282 @@ export function generatePlanJson(report: UpgradeReport, opts?: SerializeOptions)
           remediationGuidance: c.remediationGuidance ?? null,
           severity: c.severity,
         })),
+      canAutofix: s.automatedFixes > 0,
       description: s.description,
       fromVersion: s.fromVersion,
       manualActions: s.manualActions,
       npmInstall: s.npmInstall,
       referenceUrl: s.referenceUrl ?? null,
+      requiresUserDecision: s.manualActions.length > 0,
+      rollback: 'git reset --hard',
+      stepId: `${report.stack.framework.toLowerCase()}-${s.fromVersion}-to-${s.toVersion}`,
       toVersion: s.toVersion,
+      validation: report.stack.typescript ? ['npm run typecheck', 'npm test'] : ['npm test'],
     })),
     strategy: report.plan.strategy,
     toVersion: report.plan.toVersion,
   });
+}
+
+// ── Agent-contract ────────────────────────────────────────────────────────────
+
+function resolveAgentStatus(report: UpgradeReport, mode: ArtifactWriterMode): AgentStatus {
+  if (mode === 'audit') return 'needs_plan';
+  if (mode === 'apply') {
+    return report.buildStatus === 'success' ? 'complete' : 'failed';
+  }
+  const hasDeprecated = report.outdatedDependencies.some((d) => d.deprecated || d.riskCategory === 'abandoned');
+  return hasDeprecated ? 'needs_user_decisions' : 'ready_to_migrate';
+}
+
+function resolveNextCommand(status: AgentStatus): string {
+  switch (status) {
+    case 'needs_plan': return 'stack-lift plan .';
+    case 'needs_user_decisions':
+    case 'ready_to_migrate': return 'stack-lift migrate .';
+    case 'failed': return 'stack-lift apply .';
+    case 'complete': return '';
+  }
+}
+
+export function generateAgentContractJson(
+  report: UpgradeReport,
+  mode: ArtifactWriterMode,
+  opts?: SerializeOptions,
+): string {
+  const { stack, plan } = report;
+  const status = resolveAgentStatus(report, mode);
+  const hasDeprecated = report.outdatedDependencies.some((d) => d.deprecated || d.riskCategory === 'abandoned');
+  const counts = plan.migrationRuleCounts;
+  const safeToAutofix =
+    plan.totalBreakingChanges > 0 &&
+    plan.totalAutomatedFixes === plan.totalBreakingChanges &&
+    (counts ? counts.advisory === 0 : true);
+
+  const slug = `${stack.framework.toLowerCase()}-${stack.frameworkVersion}-to-${plan.toVersion}`;
+
+  const contract = {
+    artifacts: {
+      agentInstructions: 'agent-instructions.md',
+      analysis: 'analysis.json',
+      decisions: 'decisions.required.json',
+      execution: 'execution.json',
+      findings: 'findings.json',
+      plan: 'plan.json',
+      report: `stacklift-report-${slug}.md`,
+      reportJson: `stacklift-report-${slug}.json`,
+      validation: 'validation.json',
+    },
+    generatedAt: resolveTimestamp(report, opts),
+    migration: {
+      estimatedEffort: plan.estimatedEffort,
+      riskLevel: plan.riskLevel,
+      strategy: plan.strategy,
+      targetVersion: plan.toVersion,
+      totalAutomatedFixes: plan.totalAutomatedFixes,
+      totalBreakingChanges: plan.totalBreakingChanges,
+      totalSteps: plan.steps.length,
+    },
+    mode,
+    nextRecommendedCommand: resolveNextCommand(status),
+    project: {
+      currentVersion: stack.frameworkVersion,
+      framework: stack.framework,
+      lockfileParsed: stack.lockfileParsed ?? false,
+      packageManager: stack.packageManager,
+    },
+    requiresUserDecisions: hasDeprecated,
+    safeToAutofix,
+    schemaVersion: SCHEMA_VERSION,
+    status,
+    tool: 'stack-lift' as const,
+  };
+
+  return stableStringify(contract);
+}
+
+// ── Decisions-required ────────────────────────────────────────────────────────
+
+export function generateDecisionsRequiredJson(
+  report: UpgradeReport,
+  opts?: SerializeOptions,
+): string {
+  const deprecated = report.outdatedDependencies.filter(
+    (d) => d.deprecated || d.riskCategory === 'abandoned',
+  );
+
+  const decisions = deprecated.map((d) => {
+    const id = `replace-${d.name.replace(/[@/]/g, '-').replace(/^-/, '')}`;
+    const npmPage = `https://www.npmjs.com/package/${d.name}`;
+
+    const researchSources: string[] = [npmPage];
+    if (d.homepage) researchSources.push(d.homepage);
+    if (d.repository) researchSources.push(d.repository);
+
+    return {
+      agentTask: `Research live alternatives for \`${d.name}\` by querying the npm registry and official documentation. Propose 2–3 replacement options with migration effort and API compatibility notes.`,
+      id,
+      installedVersion: d.current,
+      package: d.name,
+      reason: d.reason ?? 'deprecated or abandoned — may block framework upgrades',
+      researchSources,
+      risk: d.risk,
+      riskCategory: d.riskCategory ?? 'deprecated',
+      type: 'package_replacement' as const,
+    };
+  });
+
+  return stableStringify({
+    decisions,
+    generatedAt: resolveTimestamp(report, opts),
+    schemaVersion: SCHEMA_VERSION,
+    totalDecisions: decisions.length,
+  });
+}
+
+// ── Agent-instructions ────────────────────────────────────────────────────────
+
+export function generateAgentInstructionsMd(
+  report: UpgradeReport,
+  mode: ArtifactWriterMode,
+): string {
+  const { stack, plan } = report;
+  const status = resolveAgentStatus(report, mode);
+  const deprecated = report.outdatedDependencies.filter(
+    (d) => d.deprecated || d.riskCategory === 'abandoned',
+  );
+
+  const lines: string[] = [
+    '# Stack Lift — Agent Instructions',
+    '',
+    `> Generated: ${report.generatedAt}  `,
+    `> Mode: \`${mode}\`  `,
+    `> Project: ${stack.framework} ${stack.frameworkVersion} → ${plan.toVersion}`,
+    '',
+    '---',
+    '',
+    '## Artifact-first protocol',
+    '',
+    'Do not rely on terminal output as the source of truth.',
+    '',
+    'Always read these files after running stack-lift:',
+    '',
+    '| File | Purpose |',
+    '|------|---------|',
+    '| `agent-contract.json` | Current status, safe-to-autofix flag, next recommended command |',
+    '| `findings.json` | All dependency findings with confidence and evidence |',
+    '| `plan.json` | Hop-by-hop migration plan with step contracts |',
+    '| `decisions.required.json` | Packages needing research — fetch live alternatives from npm/docs |',
+    '| `agent-instructions.md` | This file |',
+    '',
+    '---',
+    '',
+    '## Current status',
+    '',
+    `**Status:** \`${status}\`  `,
+  ];
+
+  if (status === 'needs_plan') {
+    lines.push('**Next command:** `stack-lift plan .`', '');
+    lines.push('Run `stack-lift plan .` to generate a hop-by-hop migration roadmap before proceeding.', '');
+  } else if (status === 'needs_user_decisions') {
+    lines.push('**Next command:** `stack-lift migrate .`', '');
+    lines.push('Deprecated/abandoned packages were detected. Research and resolve the decisions below before migrating.', '');
+  } else if (status === 'ready_to_migrate') {
+    lines.push('**Next command:** `stack-lift migrate .`', '');
+    lines.push('No blocking decisions required. Safe to proceed with guided migration.', '');
+  } else if (status === 'complete') {
+    lines.push('**Migration complete.**', '');
+  } else if (status === 'failed') {
+    lines.push('**Next command:** `stack-lift apply .`', '');
+    lines.push('Build validation failed. Review `validation.json` and re-run with fixes applied.', '');
+  }
+
+  lines.push('**Safe to autofix:**', '');
+  const counts = plan.migrationRuleCounts;
+  const safeToAutofix =
+    plan.totalBreakingChanges > 0 &&
+    plan.totalAutomatedFixes === plan.totalBreakingChanges &&
+    (counts ? counts.advisory === 0 : true);
+  lines.push(safeToAutofix ? '`true` — all breaking changes have automated fixes' : '`false` — manual review required for some breaking changes', '');
+
+  lines.push('---', '', '## Required decisions', '');
+
+  if (deprecated.length === 0) {
+    lines.push('_No package replacement decisions required._', '');
+  } else {
+    lines.push(
+      'For each package below, query the npm registry and official documentation to find current replacement options.',
+      'See `decisions.required.json` for `researchSources` URLs.',
+      '',
+    );
+    for (const d of deprecated) {
+      const npmPage = `https://www.npmjs.com/package/${d.name}`;
+      lines.push(`### \`${d.name}\` (installed: ${d.current})`);
+      lines.push(`**Reason:** ${d.reason ?? 'deprecated or abandoned'}  `);
+      lines.push(`**Risk:** ${d.risk}  `);
+      lines.push(`**npm page:** ${npmPage}  `);
+      if (d.homepage) lines.push(`**Homepage:** ${d.homepage}  `);
+      if (d.repository) lines.push(`**Repository:** ${d.repository}  `);
+      lines.push('');
+      lines.push(`**Agent task:** Fetch \`${npmPage}\` or search npm for alternatives. Propose 2–3 options with migration effort and API compatibility notes.`);
+      lines.push('');
+    }
+  }
+
+  lines.push('---', '', '## Migration overview', '');
+  lines.push(`- **Route:** ${plan.framework} ${plan.fromVersion} → ${plan.toVersion}`);
+  lines.push(`- **Strategy:** ${plan.strategy} (${plan.steps.length} step${plan.steps.length !== 1 ? 's' : ''})`);
+  lines.push(`- **Risk:** ${plan.riskLevel}`);
+  lines.push(`- **Effort:** ${plan.estimatedEffort}`);
+  lines.push(`- **Breaking changes:** ${plan.totalBreakingChanges} total, ${plan.totalAutomatedFixes} auto-fixable`);
+  if (counts) {
+    lines.push(`- **Rule classes:** ${counts.automatable} automatable, ${counts.assisted} assisted, ${counts.advisory} advisory`);
+  }
+  lines.push('');
+
+  lines.push('---', '', '## Step-by-step contracts', '');
+  for (const [i, step] of plan.steps.entries()) {
+    const stepId = `${stack.framework.toLowerCase()}-${step.fromVersion}-to-${step.toVersion}`;
+    const validation = stack.typescript ? ['npm run typecheck', 'npm test'] : ['npm test'];
+    lines.push(`### Step ${i + 1}: v${step.fromVersion} → v${step.toVersion}`);
+    lines.push('');
+    lines.push(`| Field | Value |`);
+    lines.push(`|-------|-------|`);
+    lines.push(`| stepId | \`${stepId}\` |`);
+    lines.push(`| canAutofix | \`${step.automatedFixes > 0}\` |`);
+    lines.push(`| requiresUserDecision | \`${step.manualActions.length > 0}\` |`);
+    lines.push(`| validation | \`${validation.join(' && ')}\` |`);
+    lines.push(`| rollback | \`git reset --hard\` |`);
+    if (step.referenceUrl) lines.push(`| guide | ${step.referenceUrl} |`);
+    lines.push('');
+    if (step.npmInstall.length > 0) {
+      lines.push(`**Install:** \`${step.npmInstall.join(' ')}\``);
+      lines.push('');
+    }
+    if (step.breakingChanges.length > 0) {
+      lines.push(`**Breaking changes:** ${step.breakingChanges.length} (${step.automatedFixes} auto-fixable)`);
+      lines.push('');
+    }
+    if (step.manualActions.length > 0) {
+      lines.push('**Manual actions:**');
+      for (const action of step.manualActions) {
+        lines.push(`- ${action}`);
+      }
+      lines.push('');
+    }
+  }
+
+  lines.push('---', '', '## Safety checklist', '');
+  lines.push('Before applying automated fixes, verify all of the following:');
+  lines.push('');
+  lines.push('1. Read `agent-contract.json` — confirm `safeToAutofix` is `true`');
+  lines.push('2. Read `decisions.required.json` — resolve all package replacement decisions');
+  lines.push('3. Confirm the migration step contract in `plan.json` for each step');
+  lines.push('4. Run validation commands after each step: ' + (stack.typescript ? '`npm run typecheck && npm test`' : '`npm test`'));
+  lines.push('5. On failure, run: `git reset --hard`');
+  lines.push('6. Write a migration summary after completion');
+  lines.push('');
+
+  return lines.join('\n');
 }

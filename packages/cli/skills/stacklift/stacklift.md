@@ -1,14 +1,16 @@
 ---
 name: stacklift
-description: AI-powered frontend upgrade assistant for Angular, React, and TypeScript projects
-version: 1.0.4
+description: LLM-first framework migration skill. Audits Angular, React, and legacy frontend projects, writes deterministic machine-readable migration artifacts, and helps AI coding agents safely plan, execute, validate, and roll back upgrades.
+version: 1.2.0
 author: gorde-ganesh
-tags: [angular, react, typescript, upgrade, migration, audit, plan]
+tags: [angular, react, typescript, upgrade, migration, audit, plan, llm, agents]
 ---
 
 # stacklift
 
-Use the `stack-lift` CLI to audit, plan, and apply framework upgrades for Angular, React, and TypeScript projects. Stack-lift writes structured JSON and markdown artifacts to `stacklift-output/` by default — always read those files rather than parsing terminal output.
+Stack Lift is an **artifact-first migration protocol for LLM coding agents**. It audits Angular, React, and TypeScript projects, writes structured machine-readable artifacts to `stacklift-output/`, and produces deterministic step contracts that agents can read, validate, and safely execute.
+
+**Always read `stacklift-output/agent-contract.json` after running any command. Do not rely on terminal output as the source of truth.**
 
 ## When to invoke this skill
 
@@ -28,10 +30,9 @@ npx stack-lift audit <project-path>
 
 Scans the project and writes findings to `stacklift-output/`. Reports deprecated packages, peer conflicts, and outdated deps with confidence labels. No source files are modified.
 
-**After running, read the artifact:**
+**After running, read the agent contract:**
 ```bash
-# Machine-readable findings for the agent to parse
-cat <project-path>/stacklift-output/findings.json
+cat <project-path>/stacklift-output/agent-contract.json
 ```
 
 To suppress artifact writes (stdout only):
@@ -45,11 +46,12 @@ npx stack-lift audit <project-path> --no-artifact
 npx stack-lift plan <project-path>
 ```
 
-Produces a hop-by-hop upgrade plan with breaking changes per version. Writes `plan.json` and a markdown report to `stacklift-output/`. Safe to run in CI with `--non-interactive`.
+Produces a hop-by-hop upgrade plan with breaking changes per version. Writes step contracts, decisions, and agent instructions to `stacklift-output/`. Safe to run in CI with `--non-interactive`.
 
-**After running, read the artifact:**
+**After running, read the plan contract:**
 ```bash
 cat <project-path>/stacklift-output/plan.json
+cat <project-path>/stacklift-output/decisions.required.json
 ```
 
 Target a specific version:
@@ -88,33 +90,55 @@ Restores a `migrate` session from `.stacklift/session.json`.
 
 ---
 
-## Agent workflow
+## Agent workflow — artifact-first protocol
 
 Follow this order for a complete migration run:
 
 ```
-1. npx stack-lift audit <path>          # understand scope
-   → read stacklift-output/findings.json
+1. npx stack-lift audit <path>
+   → read stacklift-output/agent-contract.json   (status, next command)
+   → read stacklift-output/findings.json          (all findings with confidence)
 
-2. npx stack-lift plan <path>           # see hop-by-hop roadmap
-   → read stacklift-output/plan.json
+2. npx stack-lift plan <path>
+   → read stacklift-output/agent-contract.json   (safeToAutofix, requiresUserDecisions)
+   → read stacklift-output/plan.json             (step contracts: stepId, canAutofix, validation, rollback)
+   → read stacklift-output/decisions.required.json  (package replacement decisions)
+   → read stacklift-output/agent-instructions.md (full agent briefing)
 
-3. npx stack-lift migrate <path> --non-interactive --target <N>
+3. Resolve all decisions in decisions.required.json before proceeding
+
+4. npx stack-lift migrate <path> --non-interactive --target <N>
    # or ask user to run interactively
 
-4. After each hop, run: npm run build && npm test
+5. After each hop, run validation commands from plan.json step contract
 ```
 
 ---
 
-## Reading output artifacts
+## Safety checklist
+
+Before applying any automated fixes:
+
+1. Read `agent-contract.json` — confirm `safeToAutofix` is `true`
+2. Read `decisions.required.json` — resolve all package replacement decisions
+3. Confirm the `plan.json` step contract for each hop (`canAutofix`, `validation`, `rollback`)
+4. Run validation commands after each step
+5. On failure, run: `git reset --hard`
+6. Write a migration summary after completion
+
+---
+
+## Output artifacts
 
 Stack-lift writes these files to `<project-path>/stacklift-output/` by default:
 
 | File | Contents |
 |------|----------|
+| `agent-contract.json` | Machine-readable status: mode, safeToAutofix, status, nextRecommendedCommand, artifact manifest |
+| `decisions.required.json` | Package replacement decisions with alternatives, recommended option, and risk level |
+| `agent-instructions.md` | Full agent briefing: status, decisions, step contracts, safety checklist |
 | `findings.json` | All audit findings: deprecated packages, peer conflicts, outdated deps |
-| `plan.json` | Full upgrade plan with hops, breaking changes, manual actions |
+| `plan.json` | Full upgrade plan with step contracts (stepId, canAutofix, validation, rollback) |
 | `analysis.json` | Dependency analysis with peer conflict detail |
 | `stacklift-report-*.md` | Human-readable markdown report |
 | `stacklift-report-*.json` | Full structured JSON report |

@@ -1,10 +1,10 @@
 {
   "baseline": null,
-  "generatedAt": "2026-05-18T11:19:21.835Z",
+  "generatedAt": "1970-01-01T00:00:00.000Z",
   "postMigration": [],
   "project": {
     "framework": "Angular",
-    "targetVersion": "13",
+    "targetVersion": "21",
     "version": "12.1.0"
   },
   "regressions": [],

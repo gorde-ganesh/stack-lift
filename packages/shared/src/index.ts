@@ -191,6 +191,10 @@ export interface DependencyInfo {
   observedIn?: string;
   /** How confident we are in this finding. Defaults to 'medium' when unknown. */
   confidence: Confidence;
+  /** Project homepage as declared in npm package.json. */
+  homepage?: string;
+  /** Source repository URL as declared in npm package.json. */
+  repository?: string;
 }
 
 export interface PeerDepConflict {
@@ -373,4 +377,62 @@ export interface AnalyzeOptions {
   targetVersion?: string;
   apply?: boolean;
   outputFormat?: 'terminal' | 'markdown' | 'json';
+}
+
+export type AgentStatus =
+  | 'needs_plan'
+  | 'needs_user_decisions'
+  | 'ready_to_migrate'
+  | 'complete'
+  | 'failed';
+
+export type ArtifactWriterMode = 'audit' | 'plan' | 'migrate' | 'apply';
+
+export interface DecisionOption {
+  name: string;
+  description: string;
+  effort: 'none' | 'low' | 'medium' | 'high';
+  apiSimilarity: 'identical' | 'high' | 'medium' | 'low';
+  notes?: string;
+}
+
+export interface DecisionItem {
+  id: string;
+  type: 'package_replacement' | 'manual_action';
+  package?: string;
+  installedVersion?: string;
+  reason: string;
+  /** Live URLs for the agent to research alternatives (npm page, homepage, repository). */
+  researchSources: string[];
+  /** Natural-language task description for the agent. */
+  agentTask: string;
+  risk: RiskLevel;
+  riskCategory?: RiskCategory;
+}
+
+export interface AgentContract {
+  schemaVersion: string;
+  generatedAt: string;
+  tool: 'stack-lift';
+  mode: ArtifactWriterMode;
+  project: {
+    framework: string;
+    currentVersion: string;
+    packageManager: string;
+    lockfileParsed: boolean;
+  };
+  migration: {
+    targetVersion: string;
+    strategy: string;
+    totalSteps: number;
+    riskLevel: RiskLevel;
+    estimatedEffort: string;
+    totalBreakingChanges: number;
+    totalAutomatedFixes: number;
+  };
+  status: AgentStatus;
+  safeToAutofix: boolean;
+  requiresUserDecisions: boolean;
+  nextRecommendedCommand: string;
+  artifacts: Record<string, string>;
 }

@@ -1,0 +1,36 @@
+{
+  "artifacts": {
+    "agentInstructions": "agent-instructions.md",
+    "analysis": "analysis.json",
+    "decisions": "decisions.required.json",
+    "execution": "execution.json",
+    "findings": "findings.json",
+    "plan": "plan.json",
+    "report": "stacklift-report-angular-12.1.0-to-21.md",
+    "reportJson": "stacklift-report-angular-12.1.0-to-21.json",
+    "validation": "validation.json"
+  },
+  "generatedAt": "1970-01-01T00:00:00.000Z",
+  "migration": {
+    "estimatedEffort": "1–2 weeks",
+    "riskLevel": "critical",
+    "strategy": "incremental",
+    "targetVersion": "21",
+    "totalAutomatedFixes": 2,
+    "totalBreakingChanges": 24,
+    "totalSteps": 9
+  },
+  "mode": "audit",
+  "nextRecommendedCommand": "stack-lift plan .",
+  "project": {
+    "currentVersion": "12.1.0",
+    "framework": "Angular",
+    "lockfileParsed": true,
+    "packageManager": "npm"
+  },
+  "requiresUserDecisions": true,
+  "safeToAutofix": false,
+  "schemaVersion": "1.0",
+  "status": "needs_plan",
+  "tool": "stack-lift"
+}

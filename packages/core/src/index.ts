@@ -66,6 +66,9 @@ export {
   generateFindingsJson,
   generatePlanJson,
   generateValidationJson,
+  generateAgentContractJson,
+  generateDecisionsRequiredJson,
+  generateAgentInstructionsMd,
   STABLE_TIMESTAMP,
   type SerializeOptions,
 } from './reporting/doc-generator.js';

@@ -72,6 +72,8 @@ export async function analyzeDependencies(stack: StackInfo): Promise<DependencyA
           latestSource: 'inferred',
           observedIn: 'package.json',
           confidence: 'high',
+          ...(info.homepage ? { homepage: info.homepage } : {}),
+          ...(info.repository ? { repository: info.repository } : {}),
         });
       }
       continue;
@@ -114,6 +116,8 @@ export async function analyzeDependencies(stack: StackInfo): Promise<DependencyA
       latestSource: 'registry',
       observedIn: stack.lockfileParsed ? 'package-lock.json' : 'package.json',
       confidence: isDeprecated ? 'high' : 'high',
+      ...(info.homepage ? { homepage: info.homepage } : {}),
+      ...(info.repository ? { repository: info.repository } : {}),
     });
   }
 

@@ -1,36 +1,17 @@
 {
   "buildValidation": null,
-  "decisions": {
-    "autoApply": false,
-    "backupStrategy": "none",
-    "objective": "minimal-risk",
-    "outputDir": "./stacklift-output",
-    "outputFormats": ["markdown"],
-    "packageReplacements": [
-      {
-        "chosen": null,
-        "occurrences": 0,
-        "package": "tslint"
-      },
-      {
-        "chosen": null,
-        "occurrences": 0,
-        "package": "codelyzer"
-      }
-    ],
-    "targetVersion": "13"
-  },
-  "effortBasis": "5 catalogued breaking changes, 6 manual actions across 1 hop(s), 0 affected file(s), 0 occurrence(s) in source — does not account for test coverage or CI complexity",
-  "estimatedEffort": "1–2 days",
+  "decisions": null,
+  "effortBasis": "24 catalogued breaking changes, 35 manual actions across 9 hop(s) — does not account for test coverage or CI complexity",
+  "estimatedEffort": "1–2 weeks",
   "framework": "Angular",
   "fromVersion": "12",
-  "generatedAt": "2026-05-18T11:19:21.835Z",
+  "generatedAt": "1970-01-01T00:00:00.000Z",
   "migrationRuleCounts": {
-    "advisory": 3,
-    "assisted": 1,
-    "automatable": 1
+    "advisory": 9,
+    "assisted": 13,
+    "automatable": 2
   },
-  "riskLevel": "high",
+  "riskLevel": "critical",
   "schemaVersion": "1.0",
   "steps": [
     {
@@ -86,6 +67,7 @@
           "severity": "high"
         }
       ],
+      "canAutofix": true,
       "description": "Angular 13: ViewEngine removed, IE11 dropped, APF v13, persistentTsConfig",
       "fromVersion": "12",
       "manualActions": [
@@ -107,9 +89,456 @@
         "zone.js@~0.11.4"
       ],
       "referenceUrl": "https://angular.dev/update-guide?v=12.0-13.0&l=3",
-      "toVersion": "13"
+      "requiresUserDecision": true,
+      "rollback": "git reset --hard",
+      "stepId": "angular-12-to-13",
+      "toVersion": "13",
+      "validation": [
+        "npm run typecheck",
+        "npm test"
+      ]
+    },
+    {
+      "breakingChanges": [
+        {
+          "api": "FormControl strict typing",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "api",
+          "confidence": "medium",
+          "description": "Reactive forms are now strictly typed; untyped variants have Untyped prefix",
+          "remediationGuidance": "new FormControl<string | null>(null)  // or new UntypedFormControl()",
+          "severity": "high"
+        },
+        {
+          "api": "RouterLinkWithHref",
+          "automated": false,
+          "automationLevel": "advisory",
+          "category": "api",
+          "confidence": "medium",
+          "description": "RouterLinkWithHref merged into RouterLink directive",
+          "remediationGuidance": "RouterLinkWithHref merged into RouterLink directive",
+          "severity": "low"
+        }
+      ],
+      "canAutofix": false,
+      "description": "Angular 14: Standalone components (developer preview), typed reactive forms, inject() function",
+      "fromVersion": "13",
+      "manualActions": [
+        "Run: ng update @angular/core@14 @angular/cli@14",
+        "Run: ng update @angular/cdk@14 @angular/material@14 (if used)",
+        "Migrate FormControl usages to typed forms or prefix with Untyped",
+        "Remove RouterLinkWithHref imports — use RouterLink instead"
+      ],
+      "npmInstall": [
+        "@angular/core@14",
+        "@angular/cli@14",
+        "@angular/common@14",
+        "@angular/forms@14",
+        "@angular/router@14",
+        "typescript@~4.6.0",
+        "rxjs@~7.5.0"
+      ],
+      "referenceUrl": "https://angular.dev/update-guide?v=13.0-14.0&l=3",
+      "requiresUserDecision": true,
+      "rollback": "git reset --hard",
+      "stepId": "angular-13-to-14",
+      "toVersion": "14",
+      "validation": [
+        "npm run typecheck",
+        "npm test"
+      ]
+    },
+    {
+      "breakingChanges": [
+        {
+          "api": "DATE_PIPE_DEFAULT_TIMEZONE",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "api",
+          "confidence": "medium",
+          "description": "DATE_PIPE_DEFAULT_TIMEZONE token replaced by DATE_PIPE_DEFAULT_OPTIONS",
+          "remediationGuidance": "DATE_PIPE_DEFAULT_TIMEZONE token replaced by DATE_PIPE_DEFAULT_OPTIONS",
+          "severity": "low"
+        },
+        {
+          "api": "ESM-only Angular packages",
+          "automated": false,
+          "automationLevel": "advisory",
+          "category": "config",
+          "confidence": "medium",
+          "description": "Angular packages are now ESM-only; CommonJS projects need build tooling adjustment",
+          "remediationGuidance": "Angular packages are now ESM-only; CommonJS projects need build tooling adjustment",
+          "severity": "medium"
+        },
+        {
+          "api": "initialNavigation router option",
+          "automated": true,
+          "automationLevel": "automatable",
+          "category": "config",
+          "confidence": "medium",
+          "description": "Router option 'enabled' renamed to 'enabledBlocking'",
+          "remediationGuidance": "initialNavigation: 'enabledBlocking'",
+          "severity": "low"
+        }
+      ],
+      "canAutofix": true,
+      "description": "Angular 15: Stable standalone APIs, directive composition API, ESM-only packages",
+      "fromVersion": "14",
+      "manualActions": [
+        "Run: ng update @angular/core@15 @angular/cli@15",
+        "Run: ng update @angular/cdk@15 @angular/material@15 (if used) — note: Angular Material 15 is the MDC migration; expect component API changes",
+        "Replace 'enabled' with 'enabledBlocking' in router initialNavigation option",
+        "Replace DATE_PIPE_DEFAULT_TIMEZONE with DATE_PIPE_DEFAULT_OPTIONS"
+      ],
+      "npmInstall": [
+        "@angular/core@15",
+        "@angular/cli@15",
+        "@angular/common@15",
+        "@angular/forms@15",
+        "@angular/router@15",
+        "typescript@~4.8.0",
+        "rxjs@~7.5.0"
+      ],
+      "referenceUrl": "https://angular.dev/update-guide?v=14.0-15.0&l=3",
+      "requiresUserDecision": true,
+      "rollback": "git reset --hard",
+      "stepId": "angular-14-to-15",
+      "toVersion": "15",
+      "validation": [
+        "npm run typecheck",
+        "npm test"
+      ]
+    },
+    {
+      "breakingChanges": [
+        {
+          "api": "CanActivate / CanDeactivate functional guards",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "api",
+          "confidence": "medium",
+          "description": "Class-based guards are deprecated; migrate to functional guards",
+          "remediationGuidance": "export const authGuard: CanActivateFn = () => inject(AuthService).isLoggedIn();",
+          "severity": "medium"
+        },
+        {
+          "api": "HttpClientModule -> provideHttpClient()",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "api",
+          "confidence": "medium",
+          "description": "Standalone bootstrap APIs can replace HttpClientModule with provideHttpClient(), but NgModule bootstraps may need a guided migration",
+          "remediationGuidance": "If the app uses bootstrapApplication(), move HttpClient setup to providers with provideHttpClient(); keep HttpClientModule for NgModule-only bootstraps until the module architecture is migrated.",
+          "severity": "low"
+        },
+        {
+          "api": "ngcc",
+          "automated": false,
+          "automationLevel": "advisory",
+          "category": "config",
+          "confidence": "medium",
+          "description": "ngcc (Angular Compatibility Compiler) is removed",
+          "remediationGuidance": "ngcc (Angular Compatibility Compiler) is removed",
+          "severity": "low"
+        }
+      ],
+      "canAutofix": false,
+      "description": "Angular 16: Signals (developer preview), required inputs, inject() in guards/resolvers",
+      "fromVersion": "15",
+      "manualActions": [
+        "Run: ng update @angular/core@16 @angular/cli@16",
+        "Run: ng update @angular/cdk@16 @angular/material@16 (if used)",
+        "Migrate class-based guards to functional guards",
+        "Remove ngcc postinstall script from package.json if present"
+      ],
+      "npmInstall": [
+        "@angular/core@16",
+        "@angular/cli@16",
+        "@angular/common@16",
+        "@angular/forms@16",
+        "@angular/router@16",
+        "typescript@~5.0.0",
+        "rxjs@~7.8.0",
+        "zone.js@~0.13.0"
+      ],
+      "referenceUrl": "https://angular.dev/update-guide?v=15.0-16.0&l=3",
+      "requiresUserDecision": true,
+      "rollback": "git reset --hard",
+      "stepId": "angular-15-to-16",
+      "toVersion": "16",
+      "validation": [
+        "npm run typecheck",
+        "npm test"
+      ]
+    },
+    {
+      "breakingChanges": [
+        {
+          "api": "*ngFor structural directive",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "syntax",
+          "confidence": "medium",
+          "description": "New built-in @for replaces *ngFor; requires track expression",
+          "remediationGuidance": "@for (item of items; track item.id) { <li>{{ item }}</li> }",
+          "severity": "low"
+        },
+        {
+          "api": "*ngIf structural directive",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "syntax",
+          "confidence": "medium",
+          "description": "New built-in @if replaces *ngIf (old syntax still works but is legacy)",
+          "remediationGuidance": "@if (condition) { <div>...</div> }",
+          "severity": "low"
+        },
+        {
+          "api": "*ngSwitch structural directive",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "syntax",
+          "confidence": "medium",
+          "description": "New built-in @switch replaces *ngSwitch",
+          "remediationGuidance": "@switch (value) { @case ('a') { <span>A</span> } }",
+          "severity": "low"
+        },
+        {
+          "api": "BrowserModule.withServerTransition",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "api",
+          "confidence": "medium",
+          "description": "BrowserModule.withServerTransition is deprecated",
+          "remediationGuidance": "BrowserModule.withServerTransition is deprecated",
+          "severity": "low"
+        }
+      ],
+      "canAutofix": false,
+      "description": "Angular 17: Built-in control flow (@if, @for, @switch), deferrable views (@defer), new project defaults",
+      "fromVersion": "16",
+      "manualActions": [
+        "Run: ng update @angular/core@17 @angular/cli@17",
+        "Optionally run the control-flow migration: ng g @angular/core:control-flow",
+        "Add track expression to all @for blocks"
+      ],
+      "npmInstall": [
+        "@angular/core@17",
+        "@angular/cli@17",
+        "@angular/common@17",
+        "@angular/forms@17",
+        "@angular/router@17",
+        "typescript@~5.2.0",
+        "rxjs@~7.8.0",
+        "zone.js@~0.14.0"
+      ],
+      "referenceUrl": "https://angular.dev/update-guide?v=16.0-17.0&l=3",
+      "requiresUserDecision": true,
+      "rollback": "git reset --hard",
+      "stepId": "angular-16-to-17",
+      "toVersion": "17",
+      "validation": [
+        "npm run typecheck",
+        "npm test"
+      ]
+    },
+    {
+      "breakingChanges": [
+        {
+          "api": "RedirectCommand",
+          "automated": false,
+          "automationLevel": "advisory",
+          "category": "api",
+          "confidence": "medium",
+          "description": "Router guards can now return RedirectCommand for typed redirects",
+          "remediationGuidance": "Router guards can now return RedirectCommand for typed redirects",
+          "severity": "low"
+        },
+        {
+          "api": "zone.js optional",
+          "automated": false,
+          "automationLevel": "advisory",
+          "category": "config",
+          "confidence": "medium",
+          "description": "Experimental zoneless change detection is available via provideExperimentalZonelessChangeDetection()",
+          "remediationGuidance": "Experimental zoneless change detection is available via provideExperimentalZonelessChangeDetection()",
+          "severity": "low"
+        }
+      ],
+      "canAutofix": false,
+      "description": "Angular 18: Stable control flow, experimental zoneless, material 3 stable",
+      "fromVersion": "17",
+      "manualActions": [
+        "Run: ng update @angular/core@18 @angular/cli@18",
+        "Run: ng update @angular/cdk@18 @angular/material@18 (if used)"
+      ],
+      "npmInstall": [
+        "@angular/core@18",
+        "@angular/cli@18",
+        "@angular/common@18",
+        "@angular/forms@18",
+        "@angular/router@18",
+        "typescript@~5.4.0",
+        "rxjs@~7.8.0",
+        "zone.js@~0.14.0"
+      ],
+      "referenceUrl": "https://angular.dev/update-guide?v=17.0-18.0&l=3",
+      "requiresUserDecision": true,
+      "rollback": "git reset --hard",
+      "stepId": "angular-17-to-18",
+      "toVersion": "18",
+      "validation": [
+        "npm run typecheck",
+        "npm test"
+      ]
+    },
+    {
+      "breakingChanges": [
+        {
+          "api": "afterRender phase API renamed",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "api",
+          "confidence": "medium",
+          "description": "afterRender hook phase constants renamed: EarlyRead → Read, Write → Write, MixedReadWrite → MixedReadWrite (verify with ng update schematic)",
+          "remediationGuidance": "afterRender hook phase constants renamed: EarlyRead → Read, Write → Write, MixedReadWrite → MixedReadWrite (verify with ng update schematic)",
+          "severity": "low"
+        },
+        {
+          "api": "provideHttpClient(withFetch())",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "config",
+          "confidence": "medium",
+          "description": "withFetch() is now the default for Angular 19 new projects; existing projects are unaffected unless explicitly relying on XHR behavior differences",
+          "remediationGuidance": "withFetch() is now the default for Angular 19 new projects; existing projects are unaffected unless explicitly relying on XHR behavior differences",
+          "severity": "low"
+        },
+        {
+          "api": "standalone: true is default",
+          "automated": false,
+          "automationLevel": "advisory",
+          "category": "config",
+          "confidence": "medium",
+          "description": "New components generated by the CLI are standalone by default; existing NgModule-based components are unchanged",
+          "remediationGuidance": "New components generated by the CLI are standalone by default; existing NgModule-based components are unchanged",
+          "severity": "low"
+        }
+      ],
+      "canAutofix": false,
+      "description": "Angular 19: Stable signal APIs, incremental hydration (developer preview), route-level render mode, @let template variables",
+      "fromVersion": "18",
+      "manualActions": [
+        "Run: ng update @angular/core@19 @angular/cli@19",
+        "Run: ng update @angular/cdk@19 @angular/material@19 (if used)",
+        "Review afterRender() usages if using phase-specific hooks",
+        "Verify HttpClient behavior if your app relies on XHR-specific features (cookies, withCredentials)"
+      ],
+      "npmInstall": [
+        "@angular/core@19",
+        "@angular/cli@19",
+        "@angular/common@19",
+        "@angular/forms@19",
+        "@angular/router@19",
+        "typescript@~5.6.0",
+        "rxjs@~7.8.0",
+        "zone.js@~0.15.0"
+      ],
+      "referenceUrl": "https://angular.dev/update-guide?v=18.0-19.0&l=3",
+      "requiresUserDecision": true,
+      "rollback": "git reset --hard",
+      "stepId": "angular-18-to-19",
+      "toVersion": "19",
+      "validation": [
+        "npm run typecheck",
+        "npm test"
+      ]
+    },
+    {
+      "breakingChanges": [
+        {
+          "api": "ReflectiveInjector removed",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "api",
+          "confidence": "medium",
+          "description": "ReflectiveInjector was deprecated since Angular 8 and is fully removed in v20. Use Injector.create() instead.",
+          "remediationGuidance": "Injector.create({ providers: [{ provide: MyService }] })",
+          "severity": "high"
+        },
+        {
+          "api": "TestBed.configureTestingModule deprecations enforced",
+          "automated": false,
+          "automationLevel": "assisted",
+          "category": "api",
+          "confidence": "medium",
+          "description": "Several deprecated TestBed APIs from v12–v15 emit hard errors in v20 where they previously warned",
+          "remediationGuidance": "Several deprecated TestBed APIs from v12–v15 emit hard errors in v20 where they previously warned",
+          "severity": "medium"
+        }
+      ],
+      "canAutofix": false,
+      "description": "Angular 20: Stable incremental hydration, stable resource API, signal-based forms (developer preview)",
+      "fromVersion": "19",
+      "manualActions": [
+        "Run: ng update @angular/core@20 @angular/cli@20",
+        "Run: ng update @angular/cdk@20 @angular/material@20 (if used)",
+        "Search for ReflectiveInjector and migrate to Injector.create()",
+        "Run ng build and ng test after upgrade; address any newly-hard errors from deprecated APIs"
+      ],
+      "npmInstall": [
+        "@angular/core@20",
+        "@angular/cli@20",
+        "@angular/common@20",
+        "@angular/forms@20",
+        "@angular/router@20",
+        "typescript@~5.8.0",
+        "rxjs@~7.8.0",
+        "zone.js@~0.15.0"
+      ],
+      "referenceUrl": "https://angular.dev/update-guide?v=19.0-20.0&l=3",
+      "requiresUserDecision": true,
+      "rollback": "git reset --hard",
+      "stepId": "angular-19-to-20",
+      "toVersion": "20",
+      "validation": [
+        "npm run typecheck",
+        "npm test"
+      ]
+    },
+    {
+      "breakingChanges": [],
+      "canAutofix": false,
+      "description": "Angular 21: framework, CLI, Material/CDK, TypeScript and ecosystem compatibility upgrade",
+      "fromVersion": "20",
+      "manualActions": [
+        "Run: ng update @angular/core@21 @angular/cli@21",
+        "Run: ng update @angular/cdk@21 @angular/material@21 (if used)",
+        "Review the Angular 21 update guide for any breaking changes specific to your setup",
+        "Run ng build and ng test after upgrade"
+      ],
+      "npmInstall": [
+        "@angular/core@21",
+        "@angular/cli@21",
+        "@angular/common@21",
+        "@angular/forms@21",
+        "@angular/router@21",
+        "typescript@~5.8.0",
+        "rxjs@~7.8.0",
+        "zone.js@~0.15.0"
+      ],
+      "referenceUrl": "https://angular.dev/update-guide?v=20.0-21.0&l=3",
+      "requiresUserDecision": true,
+      "rollback": "git reset --hard",
+      "stepId": "angular-20-to-21",
+      "toVersion": "21",
+      "validation": [
+        "npm run typecheck",
+        "npm test"
+      ]
     }
   ],
-  "strategy": "direct",
-  "toVersion": "13"
+  "strategy": "incremental",
+  "toVersion": "21"
 }

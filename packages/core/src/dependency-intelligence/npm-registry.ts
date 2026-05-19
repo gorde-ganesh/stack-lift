@@ -8,6 +8,10 @@ export interface RegistryPackageInfo {
   riskOverride?: RiskLevel;
   /** peerDependencies declared by the latest published version. */
   peerDependencies?: Record<string, string>;
+  /** Project homepage as declared in package.json. */
+  homepage?: string;
+  /** Source repository URL as declared in package.json. */
+  repository?: string;
 }
 
 interface CacheEntry {
@@ -96,11 +100,17 @@ async function fetchFromRegistry(packageName: string): Promise<RegistryPackageIn
       version: string;
       deprecated?: string;
       peerDependencies?: Record<string, string>;
+      homepage?: string;
+      repository?: string | { url?: string };
     };
 
     const knownDep = KNOWN_DEPRECATED[packageName];
     const deprecated = data.deprecated ?? knownDep?.reason;
     const riskOverride = knownDep?.riskOverride;
+    const repository =
+      typeof data.repository === 'string'
+        ? data.repository
+        : data.repository?.url?.replace(/^git\+/, '').replace(/\.git$/, '') ?? undefined;
     return {
       name: data.name,
       latest: data.version,
@@ -108,6 +118,8 @@ async function fetchFromRegistry(packageName: string): Promise<RegistryPackageIn
       hasBreakingChanges: KNOWN_BREAKING.has(packageName),
       ...(riskOverride ? { riskOverride } : {}),
       ...(data.peerDependencies ? { peerDependencies: data.peerDependencies } : {}),
+      ...(data.homepage ? { homepage: data.homepage } : {}),
+      ...(repository ? { repository } : {}),
     };
   } catch {
     clearTimeout(timer);

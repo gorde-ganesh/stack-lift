@@ -355,14 +355,14 @@ async function runAudit(
       const machineArtifacts = writeMachineArtifacts(
         report,
         outDir,
-        options.stable ? { omitTimestamp: true } : undefined,
+        { ...(options.stable ? { omitTimestamp: true } : {}), mode: 'audit' },
       );
       for (const a of [...artifacts, ...machineArtifacts]) {
         console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
       }
       console.log(
         chalk.dim(
-          `    Artifacts written to ${chalk.white('./stacklift-output/')} — read findings.json for machine output`,
+          `    Artifacts written to ${chalk.white('./stacklift-output/')} — read agent-contract.json for next steps`,
         ),
       );
     }
@@ -508,7 +508,7 @@ program
         if (fileFormats.length > 0) {
           const outDir = path.resolve(resolved, options.outDir);
           const artifacts = writeArtifacts(result.report, outDir, fileFormats);
-          const machineArtifacts = writeMachineArtifacts(result.report, outDir);
+          const machineArtifacts = writeMachineArtifacts(result.report, outDir, { mode: 'migrate' });
           for (const a of [...artifacts, ...machineArtifacts]) {
             console.log(
               chalk.green(`  ✔ ${a.format.toUpperCase()} report written to: ${a.filePath}`),
@@ -621,7 +621,7 @@ program
           const machineArtifacts = writeMachineArtifacts(
             report,
             outDir,
-            options.stable ? { omitTimestamp: true } : undefined,
+            { ...(options.stable ? { omitTimestamp: true } : {}), mode: 'plan' },
           );
           for (const a of [...artifacts, ...machineArtifacts]) {
             console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
@@ -780,7 +780,7 @@ program
 
         const outDir = path.resolve(resolved, options.outDir);
         const artifacts = writeArtifacts(result.report, outDir, ['markdown', 'json']);
-        const machineArtifacts = writeMachineArtifacts(result.report, outDir);
+        const machineArtifacts = writeMachineArtifacts(result.report, outDir, { mode: 'apply' });
         for (const a of [...artifacts, ...machineArtifacts]) {
           console.log(chalk.green(`  ✔ ${a.format.toUpperCase()} → ${a.filePath}`));
         }

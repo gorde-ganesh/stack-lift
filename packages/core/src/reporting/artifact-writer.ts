@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { UpgradeReport, ArtifactFormat } from '@stack-lift/shared';
+import type { UpgradeReport, ArtifactFormat, ArtifactWriterMode } from '@stack-lift/shared';
 import {
   generateMarkdownReport,
   generateJsonReport,
@@ -9,13 +9,19 @@ import {
   generatePlanJson,
   generateExecutionJson,
   generateValidationJson,
+  generateAgentContractJson,
+  generateDecisionsRequiredJson,
+  generateAgentInstructionsMd,
   type SerializeOptions,
 } from './doc-generator.js';
 
 export interface ArtifactResult {
   format:
     | ArtifactFormat
+    | 'agent-contract'
+    | 'agent-instructions'
     | 'analysis'
+    | 'decisions'
     | 'execution'
     | 'findings'
     | 'plan'
@@ -57,7 +63,7 @@ export function writeArtifacts(
 export function writeMachineArtifacts(
   report: UpgradeReport,
   outputDir: string,
-  opts?: SerializeOptions,
+  opts?: SerializeOptions & { mode?: ArtifactWriterMode },
 ): ArtifactResult[] {
   fs.mkdirSync(outputDir, { recursive: true });
 
@@ -83,6 +89,20 @@ export function writeMachineArtifacts(
   const findingsPath = path.join(outputDir, 'findings.json');
   fs.writeFileSync(findingsPath, generateFindingsJson(report, opts), 'utf-8');
   results.push({ format: 'findings', filePath: findingsPath });
+
+  const mode: ArtifactWriterMode = opts?.mode ?? 'plan';
+
+  const contractPath = path.join(outputDir, 'agent-contract.json');
+  fs.writeFileSync(contractPath, generateAgentContractJson(report, mode, opts), 'utf-8');
+  results.push({ format: 'agent-contract', filePath: contractPath });
+
+  const decisionsPath = path.join(outputDir, 'decisions.required.json');
+  fs.writeFileSync(decisionsPath, generateDecisionsRequiredJson(report, opts), 'utf-8');
+  results.push({ format: 'decisions', filePath: decisionsPath });
+
+  const instructionsPath = path.join(outputDir, 'agent-instructions.md');
+  fs.writeFileSync(instructionsPath, generateAgentInstructionsMd(report, mode), 'utf-8');
+  results.push({ format: 'agent-instructions', filePath: instructionsPath });
 
   return results;
 }
