@@ -90,7 +90,7 @@ npx stack-lift migrate ./my-project
 npx stack-lift skills add stacklift
 
 # Or with the CLI already installed globally
-skills add stacklift
+stack-lift skills add stacklift
 ```
 
 Once installed, invoke it inside Claude Code:
@@ -115,12 +115,10 @@ Claude Code discovers skills in `.claude/skills/` automatically when you open th
 ### Other skill commands
 
 ```bash
-skills list                              # show installed skills
-skills search angular                    # browse available skills
-skills remove stacklift                  # uninstall
-skills add stacklift --dir ./custom      # custom install dir
-
-stack-lift skills add stacklift          # same, via main binary
+stack-lift skills list                              # show installed skills
+stack-lift skills search angular                    # browse available skills
+stack-lift skills remove stacklift                  # uninstall
+stack-lift skills add stacklift --dir ./custom      # custom install dir
 ```
 
 ### Build from source
@@ -547,7 +545,7 @@ StackLift is a monorepo with Turbo orchestration. Published packages:
 packages/
 ├── cli/src/
 │   ├── cli.ts                      # Commander entry point
-│   ├── skills-cli.ts               # Skills management commands
+│   ├── skills/                     # Skills management (via `stack-lift skills`)
 │   ├── skills/                     # Skill manager and registry
 │   └── prompts/
 │       └── interaction.ts          # Interactive + non-interactive migrate flow

@@ -200,7 +200,7 @@ export function installSkill(skillName: string, customDir?: string): void {
     spinner.fail(`Unknown skill: ${chalk.bold(skillName)}`);
     const known = Object.keys(SKILL_REGISTRY).map((n) => chalk.cyan(n)).join(', ');
     console.log(`\n  Available skills: ${known}`);
-    console.log(chalk.dim(`  Run ${chalk.white('skills search')} to browse all skills.\n`));
+    console.log(chalk.dim(`  Run ${chalk.white('stack-lift skills search')} to browse all skills.\n`));
     process.exit(1);
   }
 
@@ -271,7 +271,7 @@ export function listSkills(customDir?: string): void {
 
   if (!fs.existsSync(skillsDir)) {
     console.log(chalk.dim('  No skills installed yet.'));
-    console.log(chalk.dim(`  Run ${chalk.white('skills add <name>')} to install one.\n`));
+    console.log(chalk.dim(`  Run ${chalk.white('stack-lift skills add <name>')} to install one.\n`));
     return;
   }
 
@@ -281,7 +281,7 @@ export function listSkills(customDir?: string): void {
 
   if (dirs.length === 0) {
     console.log(chalk.dim('  No skills installed yet.'));
-    console.log(chalk.dim(`  Run ${chalk.white('skills add <name>')} to install one.\n`));
+    console.log(chalk.dim(`  Run ${chalk.white('stack-lift skills add <name>')} to install one.\n`));
     return;
   }
 

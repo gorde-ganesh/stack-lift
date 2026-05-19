@@ -31,8 +31,7 @@
   ],
   "type": "module",
   "bin": {
-    "stack-lift": "./dist/cli.js",
-    "skills": "./dist/skills-cli.js"
+    "stack-lift": "./dist/cli.js"
   },
   "main": "./dist/cli.js",
   "scripts": {
