@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ---
 
+## [1.0.2] — 2026-05-19
+
+### Fixed
+- `skills add` now accepts any Claude Code skill, not just the built-in `stacklift` registry entry — pass a local directory or `.md` file path (e.g. `skills add ./my-skill/` or `skills add ./my-skill.md`) to install any skill directly
+
+---
+
 ## [1.0.1] — 2026-05-19
 
 ### Fixed
