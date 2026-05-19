@@ -1,6 +1,6 @@
 {
   "name": "@stack-lift/core",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Analysis engines for StackLift — detector, planner, executor, reporter",
   "license": "MIT",
   "repository": {
@@ -33,8 +33,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@stack-lift/schemas": "1.0.2",
-    "@stack-lift/shared": "1.0.2",
+    "@stack-lift/schemas": "1.0.3",
+    "@stack-lift/shared": "1.0.3",
     "semver": "^7.6.0",
     "ts-morph": "^28.0.0"
   },

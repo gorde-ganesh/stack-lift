@@ -1,6 +1,6 @@
 {
   "name": "@stack-lift/benchmarks",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "private": true,
   "main": "./dist/index.js",
@@ -20,8 +20,8 @@
     "test:benchmarks:update": "vitest run --config vitest.config.ts --update-snapshots"
   },
   "dependencies": {
-    "@stack-lift/angular-provider": "1.0.2",
-    "@stack-lift/core": "1.0.2"
+    "@stack-lift/angular-provider": "1.0.3",
+    "@stack-lift/core": "1.0.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
