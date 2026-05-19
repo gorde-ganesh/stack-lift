@@ -688,7 +688,7 @@ New deprecated packages with structured alternatives: `name`, `apiSimilarity`, `
 AST transforms using ts-morph. Add a new function following the `replaceTestBedGet` pattern and register it in `TRANSFORM_MAP`.
 
 **New framework support**
-Vue, Nuxt, Next.js, Svelte, NestJS — follow the Angular/React pattern in `src/knowledge/`.
+Vue, Nuxt, Next.js, Svelte, NestJS — follow the Angular/React pattern in `packages/core/src/knowledge/`.
 
 ### Development setup
 
