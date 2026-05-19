@@ -1,6 +1,6 @@
 {
   "name": "stack-lift",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "Interactive upgrade copilot for Angular, React, and TypeScript frontends",
   "keywords": [
     "angular",
@@ -43,9 +43,9 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.4.3",
-    "@stack-lift/angular-provider": "1.0.4",
-    "@stack-lift/core": "1.0.4",
-    "@stack-lift/shared": "1.0.4",
+    "@stack-lift/angular-provider": "1.1.0",
+    "@stack-lift/core": "1.1.0",
+    "@stack-lift/shared": "1.1.0",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
     "esbuild": "^0.27.7",
