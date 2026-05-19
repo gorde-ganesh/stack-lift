@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ---
 
+## [1.0.4] — 2026-05-19
+
+### Fixed
+- Removed the standalone `skills` binary from the package — it was shadowing any globally-installed `skills` command (e.g. the skills.sh CLI) on user systems. All skill management is now accessed via the `stack-lift skills` subcommand (`stack-lift skills add`, `list`, `search`, `remove`)
+- Removed stale `skills` bin entry from `package-lock.json` that caused `npx skills` to resolve to the broken stack-lift path after the binary was removed
+
+---
+
 ## [1.0.2] — 2026-05-19
 
 ### Fixed
