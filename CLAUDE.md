@@ -50,7 +50,7 @@ planner/            upgrade-planner, breaking-change-analyzer
 dependency-intelligence/  dependency-analyzer, npm-registry
 orchestration/      orchestrator (pipeline entry point), session
 execution/          refactor-engine, command-runner, build-validator, artifact-writer
-reporting/          doc-generator
+reporting/          doc-generator, artifact-writer
 providers/          framework-provider interface, registry, react-provider
 path-guard.ts       path traversal protection (called before any FS writes)
 knowledge/          (src-level) static breaking-change catalogues per framework
@@ -74,12 +74,32 @@ To add a new framework: implement `FrameworkProvider` in a new package, call `re
 
 ### CLI commands
 
-- `stack-lift audit <path>` — read-only findings with evidence/confidence labels
-- `stack-lift plan <path>` — deterministic plan, CI-safe with `--non-interactive`
+- `stack-lift audit <path>` — read-only findings with evidence/confidence labels; always writes artifacts
+- `stack-lift plan <path>` — deterministic plan, CI-safe with `--non-interactive`; always writes artifacts
 - `stack-lift migrate <path>` — interactive guided flow via `@inquirer/prompts`; saves session to `.stacklift/session.json`
-- `stack-lift apply <path>` — apply automated fixes + optional build validation
+- `stack-lift apply <path>` — apply automated fixes + optional build validation; always writes artifacts
 - `stack-lift resume [path]` — resume an interrupted `migrate` session
 - `stack-lift analyze` / `stack-lift upgrade` — deprecated aliases
+
+### LLM-first artifact protocol
+
+Every `audit`, `plan`, and `apply` run writes a deterministic artifact set to `<project>/stacklift-output/`:
+
+| File | Contents |
+|---|---|
+| `agent-contract.json` | Machine-readable run summary: `tool`, `mode`, `status`, `safeToAutofix`, `requiresUserDecisions`, `nextRecommendedCommand`, artifact manifest |
+| `decisions.required.json` | One entry per deprecated/abandoned package — carries the live npm deprecation message, npm page URL, `homepage`, and `repository` fetched from the registry at runtime; no hardcoded alternatives |
+| `agent-instructions.md` | Full agent briefing: artifact-first protocol, current status, per-package research tasks (with live URLs), step-by-step contracts, safety checklist |
+| `plan.json` | Upgrade plan; each step now includes `stepId`, `canAutofix`, `requiresUserDecision`, `validation` commands, and `rollback` command |
+| `findings.json` | All audit findings (backward-compat alias for `analysis.json`) |
+| `analysis.json` | Dependency findings with confidence and evidence labels |
+| `execution.json` | Code-fix execution journal |
+| `validation.json` | Build validation before/after |
+| `stacklift-report-*.md/json` | Human-readable full report |
+
+**Design rule:** `decisions.required.json` must never contain hardcoded package alternatives. Alternatives are always researched by the consuming agent from the `researchSources` URLs (npm page, homepage, repository) at query time.
+
+`DependencyInfo` now carries `homepage` and `repository` fetched live from npm. `npm-registry.ts` populates these from the package manifest. `PACKAGE_REPLACEMENTS` (in `knowledge/replacements.ts`) is used only for terminal/interactive output — never for machine artifacts.
 
 ### Session persistence
 
@@ -92,6 +112,8 @@ To add a new framework: implement `FrameworkProvider` in a new package, call `re
 - `planUpgrade` and `detectStack` are pure/synchronous; only `analyzeDependencies`, `applyRefactors`, and `executeCommands` have side effects.
 - `command-runner.ts` (`executeCommands`) must always create a git backup before mutating the project. It uses `git stash push --include-untracked` and restores via `git stash pop` (or `git reset --hard`) on failure. On Windows, process-tree kill uses `taskkill /T /F` because `child.kill()` only kills the `cmd.exe` shell wrapper.
 - Monorepos: `detectStack` flags `isMonorepo` but does not recurse. The CLI warns users to run per workspace.
+- `decisions.required.json` must never hardcode package alternatives — use only live data from `DependencyInfo` (`reason`, `homepage`, `repository`) fetched from npm at audit/plan time.
+- `artifact-writer.ts` (`writeMachineArtifacts`) accepts a `mode` option (`'audit' | 'plan' | 'migrate' | 'apply'`) that controls the `status` and `nextRecommendedCommand` fields in `agent-contract.json`.
 
 ### Tests and fixtures
 
