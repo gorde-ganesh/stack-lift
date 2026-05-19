@@ -1,5 +1,5 @@
 {
-  "name": "stack-lift",
+  "name": "stack-lift-root",
   "private": true,
   "version": "0.5.0",
   "description": "CLI-first autonomous Angular migration engine",
