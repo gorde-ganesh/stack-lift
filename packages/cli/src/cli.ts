@@ -836,8 +836,8 @@ program
 const skillsCmd = program.command('skills').description('Manage Claude Code skills');
 
 skillsCmd
-  .command('add <skill>')
-  .description('Install a skill into ~/.claude/skills/')
+  .command('add <skill-or-path>')
+  .description('Install a skill by registry name or from a local path (.md file or directory)')
   .option('--dir <path>', 'Override the skills installation directory')
   .action((skill: string, options: { dir?: string }) => {
     installSkill(skill, options.dir);

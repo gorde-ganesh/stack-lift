@@ -15,8 +15,9 @@ program
     'after',
     `
 Examples:
-  $ npx stack-lift skills add stacklift
-  $ skills add stacklift
+  $ skills add stacklift                    # install from built-in registry
+  $ skills add ./path/to/my-skill/          # install from local directory
+  $ skills add ./path/to/my-skill.md        # install from single .md file
   $ skills list
   $ skills search angular
   $ skills remove stacklift
@@ -24,8 +25,8 @@ Examples:
   );
 
 program
-  .command('add <skill>')
-  .description('Install a skill into Claude Code (~/.claude/skills/)')
+  .command('add <skill-or-path>')
+  .description('Install a skill by registry name or from a local path (.md file or directory)')
   .option('--dir <path>', 'Override the skills installation directory')
   .action((skill: string, options: { dir?: string }) => {
     installSkill(skill, options.dir);

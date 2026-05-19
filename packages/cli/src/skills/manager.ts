@@ -9,6 +9,148 @@ import { SKILL_REGISTRY } from './registry.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+interface SkillFrontmatter {
+  name?: string;
+  description?: string;
+  version?: string;
+  author?: string;
+  tags?: string[];
+}
+
+function parseSkillFrontmatter(content: string): SkillFrontmatter {
+  if (!content.startsWith('---')) return {};
+  const end = content.indexOf('\n---', 3);
+  if (end === -1) return {};
+  const block = content.slice(4, end);
+  const result: SkillFrontmatter = {};
+  for (const line of block.split('\n')) {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx === -1) continue;
+    const key = line.slice(0, colonIdx).trim();
+    const val = line.slice(colonIdx + 1).trim();
+    if (key === 'name') result.name = val;
+    else if (key === 'description') result.description = val;
+    else if (key === 'version') result.version = val;
+    else if (key === 'author') result.author = val;
+    else if (key === 'tags')
+      result.tags = val
+        .replace(/^\[|\]$/g, '')
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+  }
+  return result;
+}
+
+function isLocalPath(input: string): boolean {
+  return (
+    input.startsWith('./') ||
+    input.startsWith('../') ||
+    input.startsWith('/') ||
+    (process.platform === 'win32' && /^[A-Za-z]:[\\\/]/.test(input)) ||
+    fs.existsSync(input)
+  );
+}
+
+function installSkillFromLocalPath(sourcePath: string, customDir?: string): void {
+  const resolved = path.resolve(sourcePath.replace(/^~/, os.homedir()));
+  const spinner = ora(`Reading local skill: ${chalk.cyan(resolved)}`).start();
+
+  if (!fs.existsSync(resolved)) {
+    spinner.fail(`Path does not exist: ${chalk.dim(resolved)}`);
+    process.exit(1);
+  }
+
+  const stat = fs.statSync(resolved);
+  let mdFilePath: string;
+  let sourceDir: string;
+  let sourceIsDir: boolean;
+
+  if (stat.isFile()) {
+    if (!resolved.endsWith('.md')) {
+      spinner.fail(`Not a Markdown file: ${chalk.dim(resolved)}`);
+      console.log(chalk.dim('  Skill files must have a .md extension.\n'));
+      process.exit(1);
+    }
+    mdFilePath = resolved;
+    sourceDir = path.dirname(resolved);
+    sourceIsDir = false;
+  } else if (stat.isDirectory()) {
+    const dirName = path.basename(resolved);
+    const preferred = path.join(resolved, `${dirName}.md`);
+    if (fs.existsSync(preferred)) {
+      mdFilePath = preferred;
+    } else {
+      const mdFiles = fs.readdirSync(resolved).filter((f) => f.endsWith('.md'));
+      if (mdFiles.length === 0) {
+        spinner.fail(`No .md file found in directory: ${chalk.dim(resolved)}`);
+        process.exit(1);
+      }
+      if (mdFiles.length > 1) {
+        spinner.fail(
+          `Multiple .md files in ${chalk.dim(resolved)} — name one ${chalk.white(`${dirName}.md`)} to disambiguate.`
+        );
+        process.exit(1);
+      }
+      mdFilePath = path.join(resolved, mdFiles[0]);
+    }
+    sourceDir = resolved;
+    sourceIsDir = true;
+  } else {
+    spinner.fail(`Unsupported path type: ${chalk.dim(resolved)}`);
+    process.exit(1);
+  }
+
+  const content = fs.readFileSync(mdFilePath, 'utf8');
+  const frontmatter = parseSkillFrontmatter(content);
+  const mdStem = path.basename(mdFilePath, '.md');
+  const skillName = frontmatter.name ?? mdStem;
+
+  if (!skillName || !/^[a-z0-9_-]+$/i.test(skillName)) {
+    spinner.fail(`Invalid skill name: ${chalk.bold(skillName ?? '(empty)')}`);
+    console.log(chalk.dim('  Skill names must be alphanumeric (letters, digits, - or _).\n'));
+    process.exit(1);
+  }
+
+  const skillsDir = getSkillsDir(customDir);
+  const destDir = path.join(skillsDir, skillName);
+  const alreadyInstalled = fs.existsSync(destDir);
+
+  spinner.text = `Installing ${chalk.cyan(skillName)} from local path…`;
+
+  if (alreadyInstalled) {
+    fs.rmSync(destDir, { recursive: true, force: true });
+  }
+
+  fs.mkdirSync(destDir, { recursive: true });
+
+  if (sourceIsDir) {
+    copyDir(sourceDir, destDir);
+  } else {
+    fs.copyFileSync(mdFilePath, path.join(destDir, `${skillName}.md`));
+  }
+
+  const fileCount = countFiles(destDir);
+  const version = frontmatter.version ?? '(local)';
+
+  spinner.succeed(
+    alreadyInstalled
+      ? `Updated ${chalk.bold(skillName)} (local) — ${fileCount} file(s)`
+      : `Installed ${chalk.bold(skillName)} (local) — ${fileCount} file(s)`
+  );
+
+  console.log('');
+  console.log(`  ${chalk.dim('Location   ')} ${destDir}`);
+  console.log(`  ${chalk.dim('Files      ')} ${fileCount}`);
+  if (frontmatter.description) {
+    console.log(`  ${chalk.dim('Description')} ${frontmatter.description}`);
+  }
+  console.log(`  ${chalk.dim('Version    ')} ${version}`);
+  console.log('');
+  console.log(`  Use inside Claude Code: ${chalk.cyan(`/${skillName}`)}`);
+  console.log('');
+}
+
 export function getSkillsDir(customDir?: string): string {
   if (customDir) return path.resolve(customDir.replace(/^~/, os.homedir()));
   return path.join(os.homedir(), '.claude', 'skills');
@@ -46,6 +188,11 @@ function countFiles(dir: string): number {
 }
 
 export function installSkill(skillName: string, customDir?: string): void {
+  if (isLocalPath(skillName)) {
+    installSkillFromLocalPath(skillName, customDir);
+    return;
+  }
+
   const spinner = ora(`Looking up skill: ${chalk.cyan(skillName)}`).start();
 
   const entry = SKILL_REGISTRY[skillName];
